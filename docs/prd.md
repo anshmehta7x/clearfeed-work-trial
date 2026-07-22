@@ -1,0 +1,181 @@
+# Product Requirements Document: Support Ticket Assignment
+
+## 1. Problem Statement
+
+Today, support tickets are assigned manually by a team lead. As the team grows and agents work across different timezones, shifts, and days, this manual process breaks down:
+
+* Tickets that arrive while the lead is offline sit unassigned for hours.
+* The lead becomes a bottleneck, spending most of their time triaging instead of doing higher-value work.
+* Workload is distributed unevenly: some agents are overwhelmed while others are idle.
+* When a ticket is assigned to a particular agent, the lead has no structured way to explain why that choice was made.
+
+This product automates ticket assignment. Given a company and a ticket, it picks an agent who is currently working, respects each agent's workload capacity based on their scheduled availability, balances work fairly across the team, and leaves no ticket without an owner. The team lead can see coverage gaps, current workload distribution, and the reason behind every assignment decision.
+
+## 2. Target User
+
+The only user is the **Support Team Lead**.
+
+* Defines and updates when each agent is available, in which timezone, and how much work they can reasonably handle through their schedules.
+* Monitors team coverage to find gaps where no one is scheduled to work.
+* Reviews ticket assignments to understand why a specific ticket was assigned to a specific agent.
+
+## 3. Scope
+
+### In Scope
+
+* **Availability management:** Add, edit, and remove weekly recurring time windows for each agent, with a timezone.
+* **Coverage visualization:** Weekly 24/7 Gantt chart with red-tinted coverage gaps.
+* **Ticket assignment API:** Given `company_id` and `ticket_id`, return an assigned agent and a reason.
+* **Workload-aware assignment:** Determine agent eligibility and assignment using ticket density (assigned tickets per scheduled weekly hour) and a fixed maximum ticket-density threshold.
+* **Assignment tracking:** Store and display ticket assignments.
+* **Single-page UI:** Dashboard, agents section, tickets section, and edit availability modal.
+
+### Out of Scope
+
+* Authentication, authorization, roles, and user management.
+* Company, agent, and ticket creation (seeded data only).
+* Billing, payments, or account management.
+* Mobile UI.
+* Holiday calendars.
+* One-off overrides or temporary schedule changes.
+* Third-party integrations (PagerDuty, Opsgenie, etc.).
+* Daylight Saving Time (DST) transitions: availability is stored in fixed UTC offsets.
+* **Ticket resolution or closing tickets.**
+* Deployment or hosting (runs locally only).
+
+## 4. Goals & Success Criteria
+
+1. **No unowned ticket:** 100% of assignment API calls return an assigned agent, including via fallback.
+2. **Coverage gaps are visible:** The UI shows a weekly Gantt chart; uncovered time slots are highlighted in red.
+3. **Workload is balanced:** Tickets are distributed fairly among eligible agents while respecting availability and workload limits.
+4. **Assignments are explainable:** 100% of assignment API responses include a non-empty reason string, and the UI displays it.
+
+## 5. Key Definitions
+
+| Term | Definition |
+| --- | --- |
+| **Available** | An agent is available at a given moment if the current UTC time falls within one of their scheduled weekly windows. |
+| **Scheduled weekly hours** | The total number of hours an agent is scheduled to work each week, calculated from their recurring availability windows. |
+| **Ticket density** | The number of tickets currently assigned to an agent divided by their scheduled weekly hours. |
+| **Eligible** | An agent is eligible to receive a ticket if they are currently available and their ticket density is below the maximum ticket-density threshold. |
+| **Maximum ticket-density threshold** | A fixed system-wide limit on ticket density (assigned tickets per scheduled weekly hour). It is not configurable through the UI in this version. |
+| **Coverage gap** | A weekly time slot during which no agent is scheduled to work. The target is 24/7 coverage, so any uncovered slot is a gap. |
+| **Fairness** | Tickets are distributed among eligible agents by preferring the agent with the lowest ticket density. |
+| **Assignment reason** | A short, human-readable string returned by the API explaining why the selected agent was chosen (e.g., availability, ticket density, fallback). |
+
+## 6. Core Product Behavior
+
+### 6.1 Availability Management
+
+* Each agent has a weekly recurring schedule made of time windows.
+* Each window has: day of week, start time, end time, and timezone.
+* Each window is scoped to a single day of the week and cannot cross midnight. Overnight coverage (e.g., a shift spanning 22:00–02:00) must be entered as two separate windows — one ending at 23:59 on the first day, one starting at 00:00 on the following day.
+* The UI lets the lead edit an agent's schedule and timezone.
+* The system converts local window times to UTC for storage.
+* Overlapping or adjacent windows for the same agent (within the same day) are merged automatically.
+
+### 6.2 Coverage Gaps
+
+* The UI renders a weekly 24/7 **Gantt chart** showing all agent windows.
+* For this MVP, coverage is evaluated in fixed 30-minute slots across the week. This is a deliberate simplification to avoid minute-level interval calculations while still clearly surfacing staffing gaps. A slot is a coverage gap if no agent has a scheduled window covering any part of it.
+* Coverage gaps are highlighted in red.
+
+### 6.3 Assignment Algorithm & Explainability
+
+When the assignment API is invoked for a ticket (via the UI **Assign** button or an external caller):
+
+1. Load the company's agents and calculate each agent's scheduled weekly hours.
+2. Compute each agent's ticket density (assigned tickets divided by scheduled weekly hours).
+3. Build the list of **eligible** agents: currently available (per §5) and with ticket density below the maximum ticket-density threshold.
+4. If eligible agents exist, choose the one with the lowest ticket density.
+5. If multiple agents share the lowest ticket density, choose the one assigned a ticket least recently. Agents with no prior assignment are treated as least recently assigned.
+6. If no eligible agents exist, fall back to the agent whose next scheduled window starts soonest (to prioritize earliest possible handling of ticket). If still tied, pick the one with the lowest ticket density.
+7. If the ticket is already assigned, return the existing assignment and reason instead of creating a new assignment (idempotent — see §6.4).
+8. Otherwise, record the assignment (agent, timestamp, reason) and return the result.
+
+The reason string is included in every API response and displayed in the UI (ticket table §7.5, agent card detail §7.3).
+
+```mermaid
+flowchart TD
+    A[Assign request:<br/>company_id + ticket_id] --> B{Ticket already<br/>assigned?}
+    B -- Yes --> Z[Return existing<br/>assignment + reason]
+    B -- No --> C[Compute scheduled weekly hours<br/>and ticket density per agent]
+    C --> D[Build eligible agents:<br/>available AND density below threshold]
+    D --> E{Any eligible<br/>agents?}
+    E -- Yes --> F[Pick lowest ticket density]
+    F --> G{Tie on<br/>density?}
+    G -- Yes --> H[Pick least recently<br/>assigned agent]
+    G -- No --> I[Selected agent]
+    H --> I
+    E -- No --> J[Fallback: next window<br/>starts soonest]
+    J --> K{Still tied?}
+    K -- Yes --> L[Pick lowest ticket density]
+    K -- No --> I
+    L --> I
+    I --> M[Record and return assignment:<br/>agent, timestamp, reason]
+```
+
+#### Design Rationale
+
+Ticket density is used instead of raw ticket count because agents may work different numbers of hours each week. Comparing tickets relative to scheduled weekly hours distributes work proportionally across part-time and full-time agents.
+
+Least-recently-assigned is used as the tie-breaker to avoid repeatedly selecting the same agent when multiple agents have identical ticket density.
+
+When no currently eligible agent exists, assigning the ticket to the next scheduled agent ensures every ticket immediately has an owner while prioritizing the agent who can begin handling it soonest.
+
+> **Note:** Agents with zero scheduled weekly hours are considered ineligible for assignment until availability has been configured, preventing undefined ticket-density calculations.
+
+### 6.4 Ticket Lifecycle
+
+* Tickets are seeded in an unassigned state.
+* The assignment API is called with `company_id` and `ticket_id`, either from the UI **Assign** button or by an external caller.
+* The API determines the best agent, records the assignment (agent, timestamp, reason), and returns the result.
+* If the assignment API is called on a ticket that is already assigned, it returns the existing assignment and reason rather than creating a new assignment (idempotent behavior, not an error).
+* Once assigned, a ticket cannot be reassigned through the UI in this version.
+
+## 7. UI/UX Overview
+
+The UI is a single-page application for the support team lead.
+
+### 7.1 Top Stats Bar
+
+* Total number of agents in the company.
+* Total number of tickets submitted.
+* Number of assigned tickets.
+* Number of unassigned tickets (tickets that have not yet been processed by the assignment API).
+
+### 7.2 Coverage Gantt Chart
+
+* Weekly, 24/7 view showing each agent's availability windows.
+* Coverage gaps are highlighted in red.
+* Serves as the primary view for spotting uncovered time slots.
+
+### 7.3 Agents Section
+
+* Cards for each agent showing: name, agent ID, timezone, scheduled weekly hours, and current ticket density.
+* Each card lists the agent's currently assigned tickets.
+* Each card has an **Edit availability** button that opens a modal.
+
+### 7.4 Edit Availability Modal
+
+* Single timezone dropdown for the agent (applies to all windows).
+* Day-wise time slot editor: add or remove start/end windows for each day of the week.
+* Saves as recurring weekly windows.
+
+### 7.5 Tickets Section
+
+* Table of all tickets submitted to the API.
+* Columns: ticket ID, status (Assigned / Unassigned), assigned agent, assignment time, reason, and action.
+* Unassigned tickets have an **Assign** button that invokes the assignment API.
+* Assigned tickets are read-only and show the assignment reason.
+* Expandable row or tooltip for full assignment details.
+
+## 8. Assumptions
+
+* Companies, agents, and tickets are pre-seeded. The UI does not create or delete them.
+* Agent IDs and ticket IDs are unique within a company.
+* The browser timezone is used for displaying local times in the UI, including the Gantt chart.
+* A ticket can only be assigned once. Reassignment is not supported.
+* An agent's scheduled weekly hours are derived from their recurring availability windows and recalculated whenever those windows are modified.
+* A fixed maximum ticket-density threshold (assigned tickets per scheduled weekly hour) is used for all companies. The threshold is a system constant and is not configurable in this version.
+* At least one agent has a time slot configured before ticket assignment can occur.
