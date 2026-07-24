@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { assignTicket, closeTicket, getAgents, getTickets, updateAvailability } from './api/api';
 import { AgentCards } from './components/AgentCards';
 import { CoverageChart } from './components/CoverageChart';
@@ -15,12 +15,16 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const refreshGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
+    const generation = ++refreshGeneration.current;
     const [agentsResult, ticketsResult] = await Promise.all([
       getAgents(COMPANY_ID),
       getTickets(COMPANY_ID),
     ]);
+    if (generation !== refreshGeneration.current) return;
+
     setAgents(agentsResult.agents);
     setTickets(ticketsResult.tickets);
   }, []);

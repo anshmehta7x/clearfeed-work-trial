@@ -6,6 +6,7 @@ import {
   isExcessLoad,
   shortAgentId,
 } from '../lib/workload';
+import { AvailabilitySummary } from './AvailabilitySummary';
 
 interface AgentCardProps {
   agent: Agent;
@@ -43,6 +44,8 @@ export function AgentCard({ agent, activeTickets, onEditAvailability }: AgentCar
       {excess && (
         <p className="text-rust font-semibold text-xs mt-1.5">Excess load</p>
       )}
+
+      <AvailabilitySummary agent={agent} />
 
       <div className="mt-3 flex-1 min-h-0">
         <p className="font-mono text-[10px] uppercase tracking-wider text-text-muted mb-1.5">

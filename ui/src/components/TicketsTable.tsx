@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Agent, Ticket } from '../types';
 import { shortAgentId } from '../lib/workload';
 import { StatusPill } from './StatusPill';
@@ -30,8 +30,11 @@ function formatAssignedAt(iso: string | null): string {
 export function TicketsTable({ tickets, agents, onAssign, onClose }: TicketsTableProps) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const actionLocked = useRef(false);
 
   async function runAction(ticketId: string, action: () => Promise<void>) {
+    if (actionLocked.current) return;
+    actionLocked.current = true;
     setBusyId(ticketId);
     setActionError(null);
     try {
@@ -39,6 +42,7 @@ export function TicketsTable({ tickets, agents, onAssign, onClose }: TicketsTabl
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Action failed');
     } finally {
+      actionLocked.current = false;
       setBusyId(null);
     }
   }
@@ -52,7 +56,9 @@ export function TicketsTable({ tickets, agents, onAssign, onClose }: TicketsTabl
         </p>
 
         {actionError && (
-          <p className="mb-4 text-sm text-rust">{actionError}</p>
+          <p className="mb-4 text-sm text-rust" role="alert">
+            {actionError}
+          </p>
         )}
 
         <div className="overflow-x-auto border border-line rounded-[var(--radius-card)] bg-panel">
@@ -79,6 +85,7 @@ export function TicketsTable({ tickets, agents, onAssign, onClose }: TicketsTabl
               ) : (
                 tickets.map((ticket) => {
                   const busy = busyId === ticket.id;
+                  const actionsDisabled = busyId !== null;
                   return (
                     <tr key={ticket.id}>
                       <td className="font-mono px-3 py-3 border-b border-line align-middle">
@@ -100,7 +107,7 @@ export function TicketsTable({ tickets, agents, onAssign, onClose }: TicketsTabl
                         {ticket.status === 'unassigned' && (
                           <button
                             type="button"
-                            disabled={busy}
+                            disabled={actionsDisabled}
                             onClick={() => runAction(ticket.id, () => onAssign(ticket.id))}
                             className="bg-amber text-ink border-none px-3.5 py-1.5 rounded-md font-semibold cursor-pointer disabled:opacity-50"
                           >
@@ -110,7 +117,7 @@ export function TicketsTable({ tickets, agents, onAssign, onClose }: TicketsTabl
                         {ticket.status === 'assigned' && (
                           <button
                             type="button"
-                            disabled={busy}
+                            disabled={actionsDisabled}
                             onClick={() => runAction(ticket.id, () => onClose(ticket.id))}
                             className="bg-transparent border border-line text-text-muted px-3.5 py-1.5 rounded-md cursor-pointer disabled:opacity-50"
                           >

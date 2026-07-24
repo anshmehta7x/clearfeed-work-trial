@@ -47,10 +47,18 @@ function Timeline({
   );
 }
 
-function AgentRow({ agent, dayIndex }: { agent: Agent; dayIndex: number }) {
+function AgentRow({
+  agent,
+  dayIndex,
+  browserOffsetMinutes,
+}: {
+  agent: Agent;
+  dayIndex: number;
+  browserOffsetMinutes: number;
+}) {
   const startSlot = dayIndex * SLOTS_PER_DAY;
   const availability = Array.from({ length: SLOTS_PER_DAY }, (_, index) =>
-    isAgentAvailableInSlot(agent, startSlot + index),
+    isAgentAvailableInSlot(agent, startSlot + index, browserOffsetMinutes),
   );
 
   return (
@@ -70,14 +78,20 @@ interface DayBoardProps {
   agents: Agent[];
   dayIndex: number;
   currentSlotIndex: number;
+  browserOffsetMinutes: number;
 }
 
-function DayBoard({ agents, dayIndex, currentSlotIndex }: DayBoardProps) {
+function DayBoard({
+  agents,
+  dayIndex,
+  currentSlotIndex,
+  browserOffsetMinutes,
+}: DayBoardProps) {
   const startSlot = dayIndex * SLOTS_PER_DAY;
   const coverage = Array.from({ length: SLOTS_PER_DAY }, (_, index) =>
-    isSlotCovered(agents, startSlot + index),
+    isSlotCovered(agents, startSlot + index, browserOffsetMinutes),
   );
-  const gaps = getDailyCoverageGaps(agents, dayIndex);
+  const gaps = getDailyCoverageGaps(agents, dayIndex, browserOffsetMinutes);
   const isToday = Math.floor(currentSlotIndex / SLOTS_PER_DAY) === dayIndex;
   const nowPosition = ((currentSlotIndex - startSlot) / SLOTS_PER_DAY) * 100;
 
@@ -130,7 +144,12 @@ function DayBoard({ agents, dayIndex, currentSlotIndex }: DayBoardProps) {
         </div>
 
         {agents.map((agent) => (
-          <AgentRow key={agent.id} agent={agent} dayIndex={dayIndex} />
+          <AgentRow
+            key={agent.id}
+            agent={agent}
+            dayIndex={dayIndex}
+            browserOffsetMinutes={browserOffsetMinutes}
+          />
         ))}
       </div>
     </article>
@@ -156,6 +175,7 @@ export function CoverageChart({ agents }: CoverageChartProps) {
               agents={agents}
               dayIndex={dayIndex}
               currentSlotIndex={currentSlotIndex}
+              browserOffsetMinutes={browserOffset}
             />
           ))}
         </div>

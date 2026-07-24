@@ -19,55 +19,70 @@ export function getBrowserOffsetMinutes(): number {
   return new Date().getTimezoneOffset() * -1;
 }
 
-function windowCoversSlot(
+function windowCoversUtcMinute(
   window: AvailabilityWindow,
-  slotStartUtc: number,
-  slotEndUtc: number,
+  utcMinute: number,
 ): boolean {
-  const winStart = window.startMinuteUtc;
-  const winEnd = winStart + window.durationMinutes;
-
-  function intervalInside(a: number, b: number): boolean {
-    if (winEnd <= MINUTES_PER_WEEK) {
-      return a >= winStart && b <= winEnd;
-    }
-
-    const winEndWrapped = winEnd % MINUTES_PER_WEEK;
-    return (a >= winStart && b <= MINUTES_PER_WEEK) || (a >= 0 && b <= winEndWrapped);
-  }
-
-  if (slotEndUtc > slotStartUtc) {
-    return intervalInside(slotStartUtc, slotEndUtc);
-  }
-
-  return (
-    intervalInside(slotStartUtc, MINUTES_PER_WEEK) &&
-    intervalInside(0, slotEndUtc)
-  );
+  return normalize(utcMinute - window.startMinuteUtc) < window.durationMinutes;
 }
 
-export function isAgentAvailableInSlot(agent: Agent, slotIndex: number): boolean {
-  const offset = getBrowserOffsetMinutes();
+function slotMinuteUtc(
+  slotIndex: number,
+  minuteWithinSlot: number,
+  browserOffsetMinutes: number,
+): number {
   const localStart = slotIndex * SLOT_MINUTES;
-  const slotStartUtc = normalize(localStart - offset);
-  const slotEndUtc = normalize(slotStartUtc + SLOT_MINUTES);
+  return normalize(localStart + minuteWithinSlot - browserOffsetMinutes);
+}
 
+function isAgentAvailableAtUtcMinute(agent: Agent, utcMinute: number): boolean {
   return agent.availabilityWindows.some((window) =>
-    windowCoversSlot(window, slotStartUtc, slotEndUtc),
+    windowCoversUtcMinute(window, utcMinute),
   );
 }
 
-export function isSlotCovered(agents: Agent[], slotIndex: number): boolean {
-  return agents.some((agent) => isAgentAvailableInSlot(agent, slotIndex));
+export function isAgentAvailableInSlot(
+  agent: Agent,
+  slotIndex: number,
+  browserOffsetMinutes = getBrowserOffsetMinutes(),
+): boolean {
+  for (let minute = 0; minute < SLOT_MINUTES; minute += 1) {
+    const utcMinute = slotMinuteUtc(slotIndex, minute, browserOffsetMinutes);
+    if (!isAgentAvailableAtUtcMinute(agent, utcMinute)) return false;
+  }
+  return true;
 }
 
-export function getDailyCoverageGaps(agents: Agent[], dayIndex: number): TimeRange[] {
+export function isSlotCovered(
+  agents: Agent[],
+  slotIndex: number,
+  browserOffsetMinutes = getBrowserOffsetMinutes(),
+): boolean {
+  for (let minute = 0; minute < SLOT_MINUTES; minute += 1) {
+    const utcMinute = slotMinuteUtc(slotIndex, minute, browserOffsetMinutes);
+    const covered = agents.some((agent) =>
+      isAgentAvailableAtUtcMinute(agent, utcMinute),
+    );
+    if (!covered) return false;
+  }
+  return true;
+}
+
+export function getDailyCoverageGaps(
+  agents: Agent[],
+  dayIndex: number,
+  browserOffsetMinutes = getBrowserOffsetMinutes(),
+): TimeRange[] {
   const dayStartSlot = dayIndex * SLOTS_PER_DAY;
   const gaps: TimeRange[] = [];
   let gapStart: number | null = null;
 
   for (let slot = 0; slot < SLOTS_PER_DAY; slot += 1) {
-    const covered = isSlotCovered(agents, dayStartSlot + slot);
+    const covered = isSlotCovered(
+      agents,
+      dayStartSlot + slot,
+      browserOffsetMinutes,
+    );
 
     if (!covered && gapStart === null) {
       gapStart = slot * SLOT_MINUTES;
