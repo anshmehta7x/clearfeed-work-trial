@@ -114,6 +114,24 @@ export function localWindowToUtc(
   };
 }
 
+export function utcWindowToLocal(
+  window: UtcAvailabilityWindow,
+  utcOffsetMinutes: number
+): LocalAvailabilityWindow {
+  const localStart = normalizeWeekMinute(window.startMinuteUtc + utcOffsetMinutes);
+  const startMinute = localStart % MINUTES_PER_DAY;
+
+  if (startMinute + window.durationMinutes > MINUTES_PER_DAY) {
+    throw new Error('UTC window does not map to a same-day local window');
+  }
+
+  return {
+    dayOfWeek: Math.floor(localStart / MINUTES_PER_DAY),
+    startMinute,
+    endMinute: startMinute + window.durationMinutes,
+  };
+}
+
 /** Validate → merge same-day overlaps → convert each window to circular UTC. */
 export function localWindowsToUtc(
   windows: LocalAvailabilityWindow[],

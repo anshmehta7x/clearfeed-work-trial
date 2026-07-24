@@ -9,13 +9,28 @@ CREATE TABLE IF NOT EXISTS ticket (
     closed_at           TIMESTAMPTZ,
     FOREIGN KEY (company_id, assigned_agent_id) REFERENCES agent(company_id, id),
     CHECK (
-        (status = 'unassigned' AND assigned_agent_id IS NULL AND reason IS NULL)
+        (
+            status = 'unassigned'
+            AND assigned_agent_id IS NULL
+            AND assigned_at IS NULL
+            AND reason IS NULL
+            AND closed_at IS NULL
+        )
         OR (
-            status IN ('assigned', 'closed')
+            status = 'assigned'
             AND assigned_agent_id IS NOT NULL
-            AND reason IS NOT NULL
             AND assigned_at IS NOT NULL
+            AND reason IS NOT NULL
             AND length(trim(reason)) > 0
+            AND closed_at IS NULL
+        )
+        OR (
+            status = 'closed'
+            AND assigned_agent_id IS NOT NULL
+            AND assigned_at IS NOT NULL
+            AND reason IS NOT NULL
+            AND length(trim(reason)) > 0
+            AND closed_at IS NOT NULL
         )
     )
 );

@@ -31,13 +31,17 @@ const companyQueueTails = new Map<string, Promise<void>>();
 function enqueueCompanyWork<T>(companyId: string, work: () => Promise<T>): Promise<T> {
   const previous = companyQueueTails.get(companyId) ?? Promise.resolve();
   const result = previous.then(work, work);
-  companyQueueTails.set(
-    companyId,
-    result.then(
-      () => undefined,
-      () => undefined
-    )
+  const tail = result.then(
+    () => undefined,
+    () => undefined
   );
+  companyQueueTails.set(companyId, tail);
+  void tail.then(() => {
+    // A newer operation may have replaced this tail while work was running.
+    if (companyQueueTails.get(companyId) === tail) {
+      companyQueueTails.delete(companyId);
+    }
+  });
   return result;
 }
 

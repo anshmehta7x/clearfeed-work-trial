@@ -65,6 +65,16 @@ describe('selectAgentForAssignment', () => {
     expect(selectAgentForAssignment(agents, mondayTenAm).agent.id).toBe(AGENT_ID);
   });
 
+  it('uses ascending id when eligible density and assignment time are tied', () => {
+    const tiedAt = new Date('2026-07-10T00:00:00.000Z');
+    const agents = [
+      agent({ id: AGENT_B_ID, ticketDensity: 0.1, lastAssignedAt: tiedAt }),
+      agent({ id: AGENT_ID, ticketDensity: 0.1, lastAssignedAt: tiedAt }),
+    ];
+
+    expect(selectAgentForAssignment(agents, mondayTenAm).agent.id).toBe(AGENT_ID);
+  });
+
   it('excludes agents at or above the density threshold from eligible path', () => {
     const agents = [
       agent({
@@ -126,6 +136,31 @@ describe('selectAgentForAssignment', () => {
     expect(choice.reason).toBe(ASSIGN_REASON_FALLBACK);
   });
 
+  it('tie-breaks fallback by density, then assignment time, then id', () => {
+    const nextWindow = [{ startMinuteUtc: 3000, durationMinutes: 60 }];
+    const agents = [
+      agent({
+        id: AGENT_B_ID,
+        ticketDensity: 0.2,
+        availabilityWindows: nextWindow,
+        lastAssignedAt: null,
+      }),
+      agent({
+        id: AGENT_ID,
+        ticketDensity: 0.1,
+        availabilityWindows: nextWindow,
+        lastAssignedAt: new Date('2026-07-10T00:00:00.000Z'),
+      }),
+    ];
+    expect(selectAgentForAssignment(agents, mondayTenAm).agent.id).toBe(AGENT_ID);
+
+    agents[0]!.ticketDensity = 0.1;
+    expect(selectAgentForAssignment(agents, mondayTenAm).agent.id).toBe(AGENT_B_ID);
+
+    agents[1]!.lastAssignedAt = null;
+    expect(selectAgentForAssignment(agents, mondayTenAm).agent.id).toBe(AGENT_ID);
+  });
+
   it('uses last-resort when no agent has availability configured', () => {
     const agents = [
       agent({
@@ -150,5 +185,30 @@ describe('selectAgentForAssignment', () => {
 
     expect(choice.agent.id).toBe(AGENT_ID);
     expect(choice.reason).toBe(ASSIGN_REASON_LAST_RESORT);
+  });
+
+  it('tie-breaks last resort by assignment time, then id', () => {
+    const agents = [
+      agent({
+        id: AGENT_B_ID,
+        scheduledWeeklyHours: 0,
+        ticketDensity: null,
+        activeTicketCount: 2,
+        availabilityWindows: [],
+        lastAssignedAt: null,
+      }),
+      agent({
+        id: AGENT_ID,
+        scheduledWeeklyHours: 0,
+        ticketDensity: null,
+        activeTicketCount: 2,
+        availabilityWindows: [],
+        lastAssignedAt: new Date('2026-07-10T00:00:00.000Z'),
+      }),
+    ];
+    expect(selectAgentForAssignment(agents, mondayTenAm).agent.id).toBe(AGENT_B_ID);
+
+    agents[1]!.lastAssignedAt = null;
+    expect(selectAgentForAssignment(agents, mondayTenAm).agent.id).toBe(AGENT_ID);
   });
 });

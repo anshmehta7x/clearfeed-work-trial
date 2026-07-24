@@ -9,6 +9,7 @@ import {
   mergeLocalWindows,
   normalizeWeekMinute,
   utcDateToWeekMinute,
+  utcWindowToLocal,
 } from '../../src/lib/availability.js';
 import { ApiError } from '../../src/types/errors.js';
 
@@ -54,6 +55,25 @@ describe('localWindowToUtc', () => {
     expect(
       localWindowToUtc({ dayOfWeek: 1, startMinute: 540, endMinute: 1020 }, 330)
     ).toEqual({ startMinuteUtc: 1650, durationMinutes: 480 });
+  });
+});
+
+describe('UTC/local round-trip', () => {
+  it.each([
+    [{ dayOfWeek: 1, startMinute: 30, endMinute: 120 }, 60],
+    [{ dayOfWeek: 0, startMinute: 0, endMinute: 60 }, 840],
+    [{ dayOfWeek: 6, startMinute: 1380, endMinute: 1440 }, -720],
+    [{ dayOfWeek: 1, startMinute: 540, endMinute: 1020 }, 330],
+  ] as const)('restores the original same-day local window', (localWindow, offset) => {
+    expect(utcWindowToLocal(localWindowToUtc(localWindow, offset), offset)).toEqual(
+      localWindow
+    );
+  });
+
+  it('rejects a stored UTC window that cannot originate from a same-day local window', () => {
+    expect(() =>
+      utcWindowToLocal({ startMinuteUtc: 1380, durationMinutes: 120 }, 0)
+    ).toThrow('UTC window does not map to a same-day local window');
   });
 });
 

@@ -6,7 +6,32 @@ import {
   UtcAvailabilityWindow,
 } from '../types/domain.js';
 
-function toAgent(row: any): Agent {
+interface AgentRow {
+  id: string;
+  company_id: string;
+  name: string;
+  utc_offset_minutes: number;
+  last_assigned_at: Date | null;
+}
+
+interface AvailabilityWindowRow {
+  start_minute_utc: number;
+  duration_minutes: number;
+}
+
+interface CompanyAvailabilityWindowRow extends AvailabilityWindowRow {
+  agent_id: string;
+}
+
+interface ActiveCountRow {
+  count: number;
+}
+
+interface AgentActiveCountRow extends ActiveCountRow {
+  agent_id: string;
+}
+
+function toAgent(row: AgentRow): Agent {
   return {
     id: row.id,
     companyId: row.company_id,
@@ -16,7 +41,7 @@ function toAgent(row: any): Agent {
   };
 }
 
-function toWindow(row: any): UtcAvailabilityWindow {
+function toWindow(row: AvailabilityWindowRow): UtcAvailabilityWindow {
   return {
     startMinuteUtc: row.start_minute_utc,
     durationMinutes: row.duration_minutes,
@@ -25,7 +50,7 @@ function toWindow(row: any): UtcAvailabilityWindow {
 
 export default class AgentRepository {
   static async findById(companyId: string, agentId: string): Promise<Agent | null> {
-    const { rows } = await pool.query(
+    const { rows } = await pool.query<AgentRow>(
       `SELECT id, company_id, name, utc_offset_minutes, last_assigned_at
        FROM agent
        WHERE id = $1 AND company_id = $2`,
@@ -45,14 +70,14 @@ export default class AgentRepository {
     }
 
     const [windowsResult, activeCountResult] = await Promise.all([
-      pool.query(
+      pool.query<AvailabilityWindowRow>(
         `SELECT start_minute_utc, duration_minutes
          FROM availability_window
          WHERE agent_id = $1
          ORDER BY start_minute_utc`,
         [agentId]
       ),
-      pool.query(
+      pool.query<ActiveCountRow>(
         `SELECT COUNT(*)::int AS count
          FROM ticket
          WHERE assigned_agent_id = $1 AND status = 'assigned'`,
@@ -70,21 +95,21 @@ export default class AgentRepository {
   /** Raw agents + windows + active counts for a company (no derived workload fields). */
   static async loadCompanyAgentsData(companyId: string): Promise<CompanyAgentsData> {
     const [agentsResult, windowsResult, activeCountsResult] = await Promise.all([
-      pool.query(
+      pool.query<AgentRow>(
         `SELECT id, company_id, name, utc_offset_minutes, last_assigned_at
          FROM agent
          WHERE company_id = $1
          ORDER BY name`,
         [companyId]
       ),
-      pool.query(
+      pool.query<CompanyAvailabilityWindowRow>(
         `SELECT aw.agent_id, aw.start_minute_utc, aw.duration_minutes
          FROM availability_window aw
          JOIN agent a ON a.id = aw.agent_id
          WHERE a.company_id = $1`,
         [companyId]
       ),
-      pool.query(
+      pool.query<AgentActiveCountRow>(
         `SELECT t.assigned_agent_id AS agent_id, COUNT(*)::int AS count
          FROM ticket t
          JOIN agent a ON a.id = t.assigned_agent_id

@@ -1,7 +1,12 @@
 import pool from '../db/pool.js';
 import { Company } from '../types/domain.js';
 
-function toCompany(row: any): Company {
+interface CompanyRow {
+  id: string;
+  name: string;
+}
+
+function toCompany(row: CompanyRow): Company {
   return {
     id: row.id,
     name: row.name,
@@ -10,7 +15,7 @@ function toCompany(row: any): Company {
 
 export default class CompanyRepository {
   static async findById(companyId: string): Promise<Company | null> {
-    const { rows } = await pool.query(
+    const { rows } = await pool.query<CompanyRow>(
       'SELECT id, name FROM company WHERE id = $1',
       [companyId]
     );

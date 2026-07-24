@@ -1,7 +1,17 @@
 import pool from '../db/pool.js';
-import { Ticket } from '../types/domain.js';
+import { Ticket, TicketStatus } from '../types/domain.js';
 
-function toTicket(row: any): Ticket {
+interface TicketRow {
+  id: string;
+  company_id: string;
+  status: TicketStatus;
+  assigned_agent_id: string | null;
+  assigned_at: Date | null;
+  reason: string | null;
+  closed_at: Date | null;
+}
+
+function toTicket(row: TicketRow): Ticket {
   return {
     id: row.id,
     companyId: row.company_id,
@@ -15,7 +25,7 @@ function toTicket(row: any): Ticket {
 
 export default class TicketRepository {
   static async findByCompany(companyId: string): Promise<Ticket[]> {
-    const { rows } = await pool.query(
+    const { rows } = await pool.query<TicketRow>(
       `SELECT id, company_id, status, assigned_agent_id, assigned_at, reason, closed_at
        FROM ticket
        WHERE company_id = $1
@@ -26,7 +36,7 @@ export default class TicketRepository {
   }
 
   static async findById(companyId: string, ticketId: string): Promise<Ticket | null> {
-    const { rows } = await pool.query(
+    const { rows } = await pool.query<TicketRow>(
       `SELECT id, company_id, status, assigned_agent_id, assigned_at, reason, closed_at
        FROM ticket
        WHERE id = $1 AND company_id = $2`,
@@ -51,7 +61,7 @@ export default class TicketRepository {
     try {
       await client.query('BEGIN');
 
-      const { rows } = await client.query(
+      const { rows } = await client.query<TicketRow>(
         `UPDATE ticket
          SET status = 'assigned',
              assigned_agent_id = $1,
@@ -92,7 +102,7 @@ export default class TicketRepository {
     ticketId: string,
     closedAt: Date
   ): Promise<Ticket | null> {
-    const { rows } = await pool.query(
+    const { rows } = await pool.query<TicketRow>(
       `UPDATE ticket
        SET status = 'closed', closed_at = $1
        WHERE id = $2 AND company_id = $3 AND status = 'assigned'
