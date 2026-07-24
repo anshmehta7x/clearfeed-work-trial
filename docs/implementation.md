@@ -262,6 +262,8 @@ If the ticket is already assigned or closed: same `200` shape, keeping the API i
 
 If already closed: same shape, returning the existing `closedAt`, keeping the API idempotent.
 
+Close runs through the same per-company FIFO queue as assign (§5), so active-workload reads and writes cannot race across the two endpoints.
+
 **Errors:**
 
 - `400` — `companyId` or `ticketId` is not a well-formed UUID
@@ -356,21 +358,25 @@ FUNCTION assignTicket(companyId, ticketId):
             reason = "Last resort: no availability configured; assigned to guarantee ownership"
 
     // Step 9: record and return
-    // Atomic claim: only succeeds if ticket is still unassigned
-    updated = UPDATE ticket
-              SET status = 'assigned', assigned_agent_id = selectedAgent.id,
-                  assigned_at = now, reason = reason
-              WHERE id = ticketId AND company_id = companyId AND status = 'unassigned'
-              RETURNING *
+    // One transaction: ticket claim + last_assigned_at. The claim only succeeds if still unassigned.
+    BEGIN TRANSACTION
+        updated = UPDATE ticket
+                  SET status = 'assigned', assigned_agent_id = selectedAgent.id,
+                      assigned_at = now, reason = reason
+                  WHERE id = ticketId AND company_id = companyId AND status = 'unassigned'
+                  RETURNING *
 
-    IF updated is NULL:
-        // Someone else won the race between our read and our write.
-        ticket = getTicket(companyId, ticketId)   // re-fetch the winner's result
-        RETURN 200 { ticketId, status: ticket.status, assignedAgentId: ticket.assignedAgentId,
-                     assignedAt: ticket.assignedAt, reason: ticket.reason }
+        IF updated is NULL:
+            ROLLBACK
+            // Someone else won the race between our read and our write.
+            ticket = getTicket(companyId, ticketId)   // re-fetch the winner's result
+            RETURN 200 { ticketId, status: ticket.status, assignedAgentId: ticket.assignedAgentId,
+                         assignedAt: ticket.assignedAt, reason: ticket.reason }
 
-    selectedAgent.lastAssignedAt = now
-    save(selectedAgent)
+        UPDATE agent
+        SET last_assigned_at = now
+        WHERE id = selectedAgent.id AND company_id = companyId
+    COMMIT
 
     RETURN 200 {
         ticketId,
@@ -388,11 +394,11 @@ FUNCTION assignTicket(companyId, ticketId):
 - `sumWindowDurations(windows)` — sums (`window.durationMinutes`) across all windows
 - `countActiveTickets(agentId)` — counts tickets where `assignedAgentId = agentId` AND `status = 'assigned'`
 
-### Concurrency: Per-Company Assignment Queue
+### Concurrency: Per-Company Workload Queue
 
-The atomic claim in Step 9 (`UPDATE ... WHERE status = 'unassigned'`) only protects races on the *same* ticket. Concurrent assigns on *different* tickets in the same company can still read stale density and pick the same agent.
+The atomic claim in Step 9 (`UPDATE ... WHERE status = 'unassigned'`) only protects races on the *same* ticket. Concurrent assigns on *different* tickets in the same company can still read stale density and pick the same agent. Concurrent close can also race an assign's active-count read and leave fairness state inconsistent.
 
-Serialize `assignTicket` per company with an in-memory FIFO queue keyed by `companyId`: Steps 2–9 run only at the front of that company's queue. Different companies run in parallel. (Scaling note: §9.)
+Serialize both `assignTicket` and `closeTicket` per company with an in-memory FIFO queue keyed by `companyId`: each operation runs only at the front of that company's queue. Different companies run in parallel. (Scaling note: §9.)
 
 ## 6. Main UI Flow
 
@@ -428,7 +434,7 @@ Agent card → **Edit availability** → modal opens: server-stored UTC windows 
 6. **UTC boundaries** — a window crossing UTC midnight or the weekly boundary remains one circular row; duration preserves an exact-midnight exclusive end without sentinels.
 7. **Overlapping or adjacent windows** — same-day local windows are merged before conversion so scheduled hours are not double-counted.
 8. **Offset change** — the modal resubmits the displayed local schedule with the new fixed offset, and UTC starts are recalculated in the same save.
-9. **Concurrent assignments** — a conditional ticket update prevents duplicate assignment of the same ticket; the per-company queue prevents stale-density selection across different tickets.
+9. **Concurrent workload changes** — a conditional ticket update prevents duplicate assignment of the same ticket; the per-company queue serializes assign-vs-assign and assign-vs-close so density and active counts stay consistent.
 10. **Cross-company IDs** — a ticket or agent outside the requested company is rejected as `404`; the composite foreign key prevents cross-company assignment in the database.
 11. **Input boundaries** — malformed IDs and invalid offsets/windows return `400`; an empty `windows` array is valid and produces zero scheduled hours.
 
@@ -447,6 +453,7 @@ Cover pure business logic:
 7. Each branch of the assignment algorithm independently (eligible-path, fallback, last-resort)
 8. Tie-break ordering at each step
 9. `computeNextWindowStart` returns `now` for an agent currently inside a window (edge case #3), not a future occurrence of that window
+10. Coverage slots: a 30-minute slot stays a gap when only part of it is covered, becomes covered only when the union covers the full slot, and the same rule holds for a circular week-boundary slot (e.g. Saturday 23:45–Sunday 00:15 split across the wrap)
 
 ### 8.2 API Tests
 
@@ -462,6 +469,7 @@ Hit every endpoint with valid and invalid inputs; assert response bodies and sta
 8. `PUT /availability` with `windows: []` → `200`, agent's `scheduledWeeklyHours` becomes `0` (edge case #11)
 9. Concurrency: fire N concurrent `assign` calls for N different unassigned tickets in the same company; assert each ticket gets assigned, no ticket is double-assigned, and the resulting distribution follows the lowest-density rule (for example, agents scheduled for 40 and 20 hours receive tickets in an approximately 2:1 ratio) rather than requiring equal raw ticket counts (edge case #9)
 10. Concurrency: fire concurrent `assign` calls for the *same* ticket; assert exactly one produces the fresh assignment and the rest return the identical idempotent result (edge case #9)
+11. Concurrency: fire concurrent `assign` and `close` calls in the same company; assert no ticket is double-assigned, closed tickets leave active workload, and final active counts / densities match the committed outcomes with no stale fairness state (edge case #9)
 
 ### 8.3 UI Tests
 
@@ -475,5 +483,5 @@ Smoke-test the SPA: page load and each main user flow (§6):
 
 ## 9. Simplifications
 
-- **Single process:** the per-company assignment queue (§5) is in-memory and correct for one Node process and is lost on restart. Multi-instance deployment would need a DB-level lock (e.g. `SELECT ... FOR UPDATE` on the company's agent rows) instead.
+- **Single process:** the per-company workload queue (§5) is in-memory and correct for one Node process and is lost on restart. Multi-instance deployment would need a DB-level lock (e.g. `SELECT ... FOR UPDATE` on the company's agent rows) instead.
 - **Single company in the UI:** one company is seeded; its `companyId` is hardcoded in the frontend. Endpoints are already scoped by `companyId` if a selector is added later.
