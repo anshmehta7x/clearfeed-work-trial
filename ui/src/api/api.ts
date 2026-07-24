@@ -29,8 +29,8 @@ export function updateAvailability(
   companyId: string,
   agentId: string,
   request: UpdateAvailabilityRequest,
-): Promise<{ agent: Agent }> {
-  return fetchJson<{ agent: Agent }>(`/companies/${companyId}/agents/${agentId}/availability`, {
+): Promise<Agent> {
+  return fetchJson<Agent>(`/companies/${companyId}/agents/${agentId}/availability`, {
     method: 'PUT',
     body: JSON.stringify(request),
   });
