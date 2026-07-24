@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Agent, AvailabilityWindow } from '../types';
-import { isSlotCovered } from './coverage';
+import type { Agent, AvailabilityWindow } from '../src/types';
+import { isSlotCovered } from '../src/lib/coverage';
 
 let agentNumber = 0;
 
