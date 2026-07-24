@@ -1,4 +1,5 @@
 import type { Agent, Ticket } from '../types';
+import { ThemeToggle } from './ThemeToggle';
 
 interface StatsBarProps {
   agents: Agent[];
@@ -23,18 +24,41 @@ export function StatsBar({ agents, tickets }: StatsBarProps) {
   ];
 
   return (
-    <div className="flex bg-paper text-ink-on-paper border-b-2 border-dashed border-line-on-paper px-8 py-6">
-      {stats.map((stat, index) => (
-        <div
-          key={stat.label}
-          className={`flex-1 px-6 ${index > 0 ? 'border-l border-line-on-paper' : ''}`}
+    <div className="bg-ink text-text border-b border-line">
+      <div className="flex items-center justify-end gap-2 px-8 pt-4">
+        <a
+          href="#coverage"
+          className="px-3 py-1.5 rounded-md border border-line text-xs font-semibold uppercase tracking-wider text-text-muted hover:border-amber hover:text-amber transition-colors"
         >
-          <span className="block font-mono font-semibold text-2xl">{stat.value}</span>
-          <span className="block text-xs font-semibold uppercase tracking-wider text-ink-on-paper-muted">
-            {stat.label}
-          </span>
-        </div>
-      ))}
+          Coverage
+        </a>
+        <a
+          href="#agents"
+          className="px-3 py-1.5 rounded-md border border-line text-xs font-semibold uppercase tracking-wider text-text-muted hover:border-amber hover:text-amber transition-colors"
+        >
+          Agents
+        </a>
+        <a
+          href="#tickets"
+          className="px-3 py-1.5 rounded-md border border-line text-xs font-semibold uppercase tracking-wider text-text-muted hover:border-amber hover:text-amber transition-colors"
+        >
+          Tickets
+        </a>
+        <ThemeToggle />
+      </div>
+      <div className="flex px-8 py-6">
+        {stats.map((stat, index) => (
+          <div
+            key={stat.label}
+            className={`flex-1 px-6 ${index > 0 ? 'border-l border-line' : ''}`}
+          >
+            <span className="block font-mono font-semibold text-2xl">{stat.value}</span>
+            <span className="block text-xs font-semibold uppercase tracking-wider text-text-muted">
+              {stat.label}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -44,7 +44,7 @@ export function TicketsTable({ tickets, agents, onAssign, onClose }: TicketsTabl
   }
 
   return (
-    <section className="py-10 pb-16">
+    <section id="tickets" className="py-10 pb-16 scroll-mt-4">
       <div className="max-w-[1100px] mx-auto px-8">
         <h2 className="text-2xl">Tickets</h2>
         <p className="text-xs text-text-muted font-mono mt-1 mb-5">

@@ -21,7 +21,7 @@ export function AgentCards({ agents, tickets, onEditAvailability }: AgentCardsPr
   }, [tickets]);
 
   return (
-    <section className="py-10">
+    <section id="agents" className="py-10 scroll-mt-4">
       <div className="max-w-[1100px] mx-auto px-8">
         <h2 className="text-2xl">Agents</h2>
         <p className="text-xs text-text-muted font-mono mt-1 mb-5">

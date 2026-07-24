@@ -1,24 +1,61 @@
 @import "tailwindcss";
 
+:root,
+[data-theme="dark"] {
+  --ink: #161B22;
+  --panel: #1F2630;
+  --paper: #E8E4D9;
+  --line: #2C333E;
+  --line-on-paper: #C9C3B2;
+  --text: #E7E9EC;
+  --text-muted: #8B94A3;
+  --ink-on-paper: #23262B;
+  --ink-on-paper-muted: #6B675C;
+  --amber: #E8A33D;
+  --amber-dim: #4A3A22;
+  --sage: #6FA98B;
+  --sage-dim: #253A31;
+  --rust: #C1483F;
+  --rust-dim: #3D2220;
+}
+
+[data-theme="light"] {
+  --ink: #E8E4D9;
+  --panel: #F3F0E7;
+  --paper: #161B22;
+  --line: #C9C3B2;
+  --line-on-paper: #2C333E;
+  --text: #23262B;
+  --text-muted: #6B675C;
+  --ink-on-paper: #E7E9EC;
+  --ink-on-paper-muted: #8B94A3;
+  --amber: #C4841F;
+  --amber-dim: #F0D9A8;
+  --sage: #3F7A5C;
+  --sage-dim: #C5DDD0;
+  --rust: #A33A33;
+  --rust-dim: #E8C4C1;
+}
+
 @theme {
-  --color-ink: #161B22;
-  --color-panel: #1F2630;
-  --color-paper: #E8E4D9;
+  --color-ink: var(--ink);
+  --color-panel: var(--panel);
+  --color-paper: var(--paper);
 
-  --color-line: #2C333E;
-  --color-line-on-paper: #C9C3B2;
+  --color-line: var(--line);
+  --color-line-on-paper: var(--line-on-paper);
 
-  --color-text: #E7E9EC;
-  --color-text-muted: #8B94A3;
-  --color-ink-on-paper: #23262B;
-  --color-ink-on-paper-muted: #6B675C;
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-ink-on-paper: var(--ink-on-paper);
+  --color-ink-on-paper-muted: var(--ink-on-paper-muted);
 
-  --color-amber: #E8A33D;
-  --color-amber-dim: #4A3A22;
-  --color-sage: #6FA98B;
-  --color-sage-dim: #253A31;
-  --color-rust: #C1483F;
-  --color-rust-dim: #3D2220;
+  --color-amber: var(--amber);
+  --color-amber-dim: var(--amber-dim);
+  --color-sage: var(--sage);
+  --color-sage-dim: var(--sage-dim);
+  --color-rust: var(--rust);
+  --color-rust-dim: var(--rust-dim);
 
   --font-display: "Big Shoulders Condensed", sans-serif;
   --font-body: "IBM Plex Sans", sans-serif;
@@ -30,6 +67,10 @@
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
