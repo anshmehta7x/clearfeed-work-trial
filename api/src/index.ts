@@ -1,17 +1,19 @@
-import express from "express";
+import app from './app.js';
+import pool from './db/pool.js';
 
-const app = express();
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
-app.use(express.json());
+const server = app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+});
 
-app.get("/", (_, res) => {
-  res.json({
-    message: "Hello World"
+async function shutdown(signal: string) {
+  console.log(`${signal} received, shutting down gracefully`);
+  server.close(async () => {
+    await pool.end();
+    process.exit(0);
   });
-});
+}
 
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`Listening on ${PORT}`);
-});
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS ticket (
             status IN ('assigned', 'closed')
             AND assigned_agent_id IS NOT NULL
             AND reason IS NOT NULL
+            AND assigned_at IS NOT NULL
             AND length(trim(reason)) > 0
         )
     )
