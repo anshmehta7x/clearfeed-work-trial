@@ -21,6 +21,10 @@ export function getPoolConfig(): PoolConfig {
   };
 }
 
-export function createPool(): Pool {
-  return new Pool(getPoolConfig());
-}
+const pool: Pool = new Pool(getPoolConfig());
+
+pool.on('error', (err) => {
+  console.error('Error on pg client', err);
+});
+
+export default pool;

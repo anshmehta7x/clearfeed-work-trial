@@ -2,7 +2,7 @@ import { access, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PoolClient, QueryResult, QueryResultRow } from "pg";
-import { createPool } from "./pool.js";
+import pool from "./pool.js";
 
 const MIGRATIONS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -128,7 +128,6 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const pool = createPool();
   const client = await pool.connect();
 
   try {
