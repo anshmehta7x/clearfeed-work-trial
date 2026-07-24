@@ -1,23 +1,33 @@
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import pool from "./pool.js";
+import type { Pool } from 'pg';
+import pool from './pool.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-async function seed() {
+/** Apply seed.sql. Does not close the pool (safe for tests). */
+export async function seedDatabase(db: Pool = pool): Promise<void> {
   const sql = readFileSync(path.join(__dirname, 'seed.sql'), 'utf-8');
-  const client = await pool.connect();
+  await db.query(sql);
+}
+
+async function main() {
   try {
-    await client.query(sql);
+    await seedDatabase();
     console.log('Seed complete.');
   } finally {
-    client.release();
     await pool.end();
   }
 }
 
-seed().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+const isDirectRun =
+  process.argv[1] !== undefined &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

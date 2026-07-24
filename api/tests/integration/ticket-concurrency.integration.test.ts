@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import app from '../../src/app.js';
 import pool from '../../src/db/pool.js';
+import { seedDatabase } from '../../src/db/seed.js';
 
 const COMPANY_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const AGENT_A_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
@@ -68,6 +69,8 @@ describe('PostgreSQL ticket concurrency', () => {
 
   afterAll(async () => {
     await deleteTestData();
+    // Restore demo seed data for local UI / manual testing on the shared DB.
+    await seedDatabase(pool);
     await pool.end();
   });
 
