@@ -33,9 +33,25 @@ export interface GetAgentsResponse {
   agents: AgentDTO[];
 }
 
+/** Same-day local window from the availability edit UI. Half-open: [start, end). */
+export interface LocalAvailabilityWindow {
+  dayOfWeek: number; // 0=Sunday .. 6=Saturday
+  startMinute: number; // 0..1439
+  endMinute: number; // 1..1440
+}
+
+export interface UpdateAvailabilityRequest {
+  utcOffsetMinutes: number;
+  windows: LocalAvailabilityWindow[];
+}
 
 export interface CompanyParams extends ParamsDictionary {
   companyId: string;
+}
+
+export interface AgentParams extends ParamsDictionary {
+  companyId: string;
+  agentId: string;
 }
 
 export interface TicketParams extends ParamsDictionary {

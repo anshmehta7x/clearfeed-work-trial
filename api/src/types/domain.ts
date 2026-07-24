@@ -18,6 +18,23 @@ export interface AvailabilityWindow {
   durationMinutes: number;  // 1..1440
 }
 
+/** Stored/circular UTC window without row identity (read models + writes). */
+export type UtcAvailabilityWindow = Pick<AvailabilityWindow, 'startMinuteUtc' | 'durationMinutes'>;
+
+/** Raw persistence payload for one agent before workload fields are derived. */
+export interface AgentData {
+  agent: Agent;
+  windows: UtcAvailabilityWindow[];
+  activeTicketCount: number;
+}
+
+/** Raw persistence payload for a company's agents before workload fields are derived. */
+export interface CompanyAgentsData {
+  agents: Agent[];
+  windowsByAgent: Map<string, UtcAvailabilityWindow[]>;
+  activeCountByAgent: Map<string, number>;
+}
+
 export type TicketStatus = 'unassigned' | 'assigned' | 'closed';
 
 export interface Ticket {
@@ -35,5 +52,5 @@ export interface AgentWithWorkload extends Agent {
   scheduledWeeklyHours: number;
   activeTicketCount: number;
   ticketDensity: number | null;
-  availabilityWindows: Pick<AvailabilityWindow, 'startMinuteUtc' | 'durationMinutes'>[];
+  availabilityWindows: UtcAvailabilityWindow[];
 }

@@ -16,7 +16,7 @@ vi.mock('../../src/repositories/company.repository.js', () => ({
 
 vi.mock('../../src/repositories/agent.repository.js', () => ({
   default: {
-    findByCompanyWithWorkload: vi.fn(),
+    loadCompanyAgentsData: vi.fn(),
   },
 }));
 
@@ -25,7 +25,7 @@ import CompanyRepository from '../../src/repositories/company.repository.js';
 import AgentRepository from '../../src/repositories/agent.repository.js';
 
 const findCompanyById = vi.mocked(CompanyRepository.findById);
-const findAgentsByCompany = vi.mocked(AgentRepository.findByCompanyWithWorkload);
+const loadCompanyAgentsData = vi.mocked(AgentRepository.loadCompanyAgentsData);
 
 describe('GET /companies/:companyId/agents', () => {
   beforeEach(() => {
@@ -34,7 +34,20 @@ describe('GET /companies/:companyId/agents', () => {
 
   it('returns 200 with agents and computed workload fields', async () => {
     findCompanyById.mockResolvedValue(company);
-    findAgentsByCompany.mockResolvedValue(agentsWithWorkload);
+    loadCompanyAgentsData.mockResolvedValue({
+      agents: agentsWithWorkload.map(
+        ({ scheduledWeeklyHours, activeTicketCount, ticketDensity, availabilityWindows, ...agent }) =>
+          agent
+      ),
+      windowsByAgent: new Map([
+        [agentsWithWorkload[0]!.id, agentsWithWorkload[0]!.availabilityWindows],
+        [agentsWithWorkload[1]!.id, agentsWithWorkload[1]!.availabilityWindows],
+      ]),
+      activeCountByAgent: new Map([
+        [agentsWithWorkload[0]!.id, agentsWithWorkload[0]!.activeTicketCount],
+        [agentsWithWorkload[1]!.id, agentsWithWorkload[1]!.activeTicketCount],
+      ]),
+    });
 
     const res = await request(app).get(`/companies/${COMPANY_ID}/agents`);
 
@@ -64,12 +77,16 @@ describe('GET /companies/:companyId/agents', () => {
       ],
     });
     expect(findCompanyById).toHaveBeenCalledWith(COMPANY_ID);
-    expect(findAgentsByCompany).toHaveBeenCalledWith(COMPANY_ID);
+    expect(loadCompanyAgentsData).toHaveBeenCalledWith(COMPANY_ID);
   });
 
   it('returns 200 with an empty agents list when the company has none', async () => {
     findCompanyById.mockResolvedValue(company);
-    findAgentsByCompany.mockResolvedValue([]);
+    loadCompanyAgentsData.mockResolvedValue({
+      agents: [],
+      windowsByAgent: new Map(),
+      activeCountByAgent: new Map(),
+    });
 
     const res = await request(app).get(`/companies/${COMPANY_ID}/agents`);
 
@@ -86,7 +103,7 @@ describe('GET /companies/:companyId/agents', () => {
       code: 'BAD_REQUEST',
     });
     expect(findCompanyById).not.toHaveBeenCalled();
-    expect(findAgentsByCompany).not.toHaveBeenCalled();
+    expect(loadCompanyAgentsData).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the company does not exist', async () => {
@@ -99,6 +116,6 @@ describe('GET /companies/:companyId/agents', () => {
       error: 'Company not found',
       code: 'NOT_FOUND',
     });
-    expect(findAgentsByCompany).not.toHaveBeenCalled();
+    expect(loadCompanyAgentsData).not.toHaveBeenCalled();
   });
 });

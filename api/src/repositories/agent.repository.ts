@@ -1,5 +1,10 @@
 import pool from '../db/pool.js';
-import { Agent, AgentWithWorkload, AvailabilityWindow } from '../types/domain.js';
+import {
+  Agent,
+  AgentData,
+  CompanyAgentsData,
+  UtcAvailabilityWindow,
+} from '../types/domain.js';
 
 function toAgent(row: any): Agent {
   return {
@@ -11,7 +16,7 @@ function toAgent(row: any): Agent {
   };
 }
 
-function toWindow(row: any): Pick<AvailabilityWindow, 'startMinuteUtc' | 'durationMinutes'> {
+function toWindow(row: any): UtcAvailabilityWindow {
   return {
     startMinuteUtc: row.start_minute_utc,
     durationMinutes: row.duration_minutes,
@@ -29,10 +34,41 @@ export default class AgentRepository {
     return rows[0] ? toAgent(rows[0]) : null;
   }
 
-  /**
-   * Returns all agents for a company with computed workload fields
-   */
-  static async findByCompanyWithWorkload(companyId: string): Promise<AgentWithWorkload[]> {
+  /** Raw agent + windows + active count for one agent (no derived workload fields). */
+  static async loadAgentData(
+    companyId: string,
+    agentId: string
+  ): Promise<AgentData | null> {
+    const agent = await this.findById(companyId, agentId);
+    if (!agent) {
+      return null;
+    }
+
+    const [windowsResult, activeCountResult] = await Promise.all([
+      pool.query(
+        `SELECT start_minute_utc, duration_minutes
+         FROM availability_window
+         WHERE agent_id = $1
+         ORDER BY start_minute_utc`,
+        [agentId]
+      ),
+      pool.query(
+        `SELECT COUNT(*)::int AS count
+         FROM ticket
+         WHERE assigned_agent_id = $1 AND status = 'assigned'`,
+        [agentId]
+      ),
+    ]);
+
+    return {
+      agent,
+      windows: windowsResult.rows.map(toWindow),
+      activeTicketCount: activeCountResult.rows[0]?.count ?? 0,
+    };
+  }
+
+  /** Raw agents + windows + active counts for a company (no derived workload fields). */
+  static async loadCompanyAgentsData(companyId: string): Promise<CompanyAgentsData> {
     const [agentsResult, windowsResult, activeCountsResult] = await Promise.all([
       pool.query(
         `SELECT id, company_id, name, utc_offset_minutes, last_assigned_at
@@ -58,7 +94,7 @@ export default class AgentRepository {
       ),
     ]);
 
-    const windowsByAgent = new Map<string, Pick<AvailabilityWindow, 'startMinuteUtc' | 'durationMinutes'>[]>();
+    const windowsByAgent = new Map<string, UtcAvailabilityWindow[]>();
     for (const row of windowsResult.rows) {
       const list = windowsByAgent.get(row.agent_id) ?? [];
       list.push(toWindow(row));
@@ -70,30 +106,66 @@ export default class AgentRepository {
       activeCountByAgent.set(row.agent_id, row.count);
     }
 
-    return agentsResult.rows.map((row): AgentWithWorkload => {
-      const agent = toAgent(row);
-      const availabilityWindows = windowsByAgent.get(agent.id) ?? [];
+    return {
+      agents: agentsResult.rows.map(toAgent),
+      windowsByAgent,
+      activeCountByAgent,
+    };
+  }
 
-      // scheduled weekly hours = sum of window durations, in hours.
-      const scheduledWeeklyMinutes = availabilityWindows.reduce(
-        (sum, w) => sum + w.durationMinutes,
-        0
+  /**
+   * Updates agent offset and replaces all availability windows in one transaction.
+   * Returns false if the agent is missing or does not belong to the company.
+   */
+  static async replaceAvailability(
+    companyId: string,
+    agentId: string,
+    utcOffsetMinutes: number,
+    windows: UtcAvailabilityWindow[]
+  ): Promise<boolean> {
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const updateResult = await client.query(
+        `UPDATE agent
+         SET utc_offset_minutes = $1
+         WHERE id = $2 AND company_id = $3`,
+        [utcOffsetMinutes, agentId, companyId]
       );
-      const scheduledWeeklyHours = scheduledWeeklyMinutes / 60;
 
-      const activeTicketCount = activeCountByAgent.get(agent.id) ?? 0;
+      if (updateResult.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return false;
+      }
 
-      // not density-eligible if no scheduled hours.
-      const ticketDensity =
-        scheduledWeeklyHours > 0 ? activeTicketCount / scheduledWeeklyHours : null;
+      await client.query(`DELETE FROM availability_window WHERE agent_id = $1`, [agentId]);
 
-      return {
-        ...agent,
-        scheduledWeeklyHours,
-        activeTicketCount,
-        ticketDensity: ticketDensity as number,
-        availabilityWindows,
-      };
-    });
+      if (windows.length > 0) {
+        const values: unknown[] = [];
+        const placeholders: string[] = [];
+
+        windows.forEach((window, index) => {
+          const base = index * 3;
+          placeholders.push(`($${base + 1}, $${base + 2}, $${base + 3})`);
+          values.push(agentId, window.startMinuteUtc, window.durationMinutes);
+        });
+
+        await client.query(
+          `INSERT INTO availability_window (agent_id, start_minute_utc, duration_minutes)
+           VALUES ${placeholders.join(', ')}`,
+          values
+        );
+      }
+
+      await client.query('COMMIT');
+      return true;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 }

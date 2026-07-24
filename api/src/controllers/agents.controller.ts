@@ -1,10 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
-import { GetAgentsResponse, AgentDTO } from '../types/dto.js';
+import {
+  GetAgentsResponse,
+  AgentDTO,
+  CompanyParams,
+  AgentParams,
+  UpdateAvailabilityRequest,
+} from '../types/dto.js';
 import { AgentWithWorkload } from '../types/domain.js';
-import { CompanyParams } from '../types/dto.js';
-import CompanyRepository from '../repositories/company.repository.js';
-import AgentRepository from '../repositories/agent.repository.js';
-import { ApiError } from '../types/errors.js';
+import AgentService from '../services/agent.service.js';
 
 function toAgentDTO(agent: AgentWithWorkload): AgentDTO {
   return {
@@ -26,14 +29,22 @@ export async function getAgents(
 ) {
   try {
     const { companyId } = req.params;
-
-    const company = await CompanyRepository.findById(companyId);
-    if (!company) {
-      throw new ApiError('NOT_FOUND', 'Company not found');
-    }
-
-    const agents = await AgentRepository.findByCompanyWithWorkload(companyId);
+    const agents = await AgentService.listAgents(companyId);
     res.status(200).json({ agents: agents.map(toAgentDTO) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateAvailability(
+  req: Request<AgentParams, AgentDTO, UpdateAvailabilityRequest>,
+  res: Response<AgentDTO>,
+  next: NextFunction
+) {
+  try {
+    const { companyId, agentId } = req.params;
+    const agent = await AgentService.updateAvailability(companyId, agentId, req.body);
+    res.status(200).json(toAgentDTO(agent));
   } catch (err) {
     next(err);
   }
