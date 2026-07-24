@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   assertValidLocalWindows,
   assertValidUtcOffset,
+  computeNextWindowStart,
+  isCurrentlyAvailable,
   localWindowToUtc,
   localWindowsToUtc,
   mergeLocalWindows,
   normalizeWeekMinute,
+  utcDateToWeekMinute,
 } from '../../src/lib/availability.js';
 import { ApiError } from '../../src/types/errors.js';
 
@@ -29,7 +32,6 @@ describe('normalizeWeekMinute', () => {
 
 describe('localWindowToUtc', () => {
   it('converts Monday 00:30–02:00 at UTC+1 to a single circular row', () => {
-    // Design doc §3.1 example
     expect(
       localWindowToUtc({ dayOfWeek: 1, startMinute: 30, endMinute: 120 }, 60)
     ).toEqual({ startMinuteUtc: 1410, durationMinutes: 90 });
@@ -138,5 +140,68 @@ describe('assertValidLocalWindows', () => {
       assertValidLocalWindows([{ dayOfWeek: 1, startMinute: 540, endMinute: 540 }])
     ).toThrow(ApiError);
     expect(() => assertValidLocalWindows('nope')).toThrow(ApiError);
+  });
+});
+
+describe('utcDateToWeekMinute', () => {
+  it('maps Sunday 00:00 UTC to 0', () => {
+    expect(utcDateToWeekMinute(new Date('2026-07-19T00:00:00.000Z'))).toBe(0);
+  });
+
+  it('maps Monday 00:30 UTC to 1470', () => {
+    expect(utcDateToWeekMinute(new Date('2026-07-20T00:30:00.000Z'))).toBe(1470);
+  });
+});
+
+describe('isCurrentlyAvailable', () => {
+  it('returns true inside a normal window and false outside', () => {
+    // Monday 09:00–17:00 UTC → start 1980, duration 480
+    const windows = [{ startMinuteUtc: 1980, durationMinutes: 480 }];
+    expect(isCurrentlyAvailable(windows, new Date('2026-07-20T10:00:00.000Z'))).toBe(true);
+    expect(isCurrentlyAvailable(windows, new Date('2026-07-20T08:59:00.000Z'))).toBe(false);
+    expect(isCurrentlyAvailable(windows, new Date('2026-07-20T17:00:00.000Z'))).toBe(false);
+  });
+
+  it('handles a window that crosses UTC midnight', () => {
+    const windows = [{ startMinuteUtc: 1410, durationMinutes: 90 }];
+    expect(isCurrentlyAvailable(windows, new Date('2026-07-19T23:45:00.000Z'))).toBe(true);
+    expect(isCurrentlyAvailable(windows, new Date('2026-07-20T00:30:00.000Z'))).toBe(true);
+    expect(isCurrentlyAvailable(windows, new Date('2026-07-20T01:00:00.000Z'))).toBe(false);
+  });
+
+  it('handles a window that crosses the Saturday/Sunday week boundary', () => {
+    // Saturday 23:00–Sunday 01:00 UTC
+    const windows = [{ startMinuteUtc: 10020, durationMinutes: 120 }];
+    expect(isCurrentlyAvailable(windows, new Date('2026-07-25T23:30:00.000Z'))).toBe(true);
+    expect(isCurrentlyAvailable(windows, new Date('2026-07-26T00:30:00.000Z'))).toBe(true);
+    expect(isCurrentlyAvailable(windows, new Date('2026-07-26T01:00:00.000Z'))).toBe(false);
+  });
+
+  it('returns false when there are no windows', () => {
+    expect(isCurrentlyAvailable([], new Date('2026-07-20T10:00:00.000Z'))).toBe(false);
+  });
+});
+
+describe('computeNextWindowStart', () => {
+  it('returns now when currently inside a window', () => {
+    const windows = [{ startMinuteUtc: 1980, durationMinutes: 480 }];
+    const now = new Date('2026-07-20T10:00:00.000Z');
+    expect(computeNextWindowStart(windows, now)).toBe(now);
+  });
+
+  it('returns the soonest future window start when outside all windows', () => {
+    const windows = [{ startMinuteUtc: 1980, durationMinutes: 480 }]; // Mon 09:00–17:00 UTC
+    const now = new Date('2026-07-20T08:00:00.000Z'); // Monday 08:00
+    expect(computeNextWindowStart(windows, now)).toEqual(
+      new Date('2026-07-20T09:00:00.000Z')
+    );
+  });
+
+  it('wraps across the week boundary to the next occurrence', () => {
+    const windows = [{ startMinuteUtc: 0, durationMinutes: 60 }]; // Sunday 00:00–01:00
+    const now = new Date('2026-07-25T12:00:00.000Z'); // Saturday noon
+    expect(computeNextWindowStart(windows, now)).toEqual(
+      new Date('2026-07-26T00:00:00.000Z')
+    );
   });
 });

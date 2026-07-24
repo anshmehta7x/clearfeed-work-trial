@@ -1,14 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
-import CompanyRepository from '../repositories/company.repository.js';
-import TicketRepository from '../repositories/ticket.repository.js';
-import { Company, Ticket} from '../types/domain.js';
+import TicketService from '../services/ticket.service.js';
+import { Ticket } from '../types/domain.js';
 import {
+  AssignTicketResponse,
+  CloseTicketResponse,
+  CompanyParams,
   GetTicketsResponse,
   TicketDTO,
   TicketParams,
 } from '../types/dto.js';
-import { ApiError } from '../types/errors.js';
-
 
 function toTicketDTO(ticket: Ticket): TicketDTO {
   return {
@@ -21,24 +21,75 @@ function toTicketDTO(ticket: Ticket): TicketDTO {
   };
 }
 
+function toAssignResponse(ticket: Ticket): AssignTicketResponse {
+  if (
+    (ticket.status !== 'assigned' && ticket.status !== 'closed') ||
+    !ticket.assignedAgentId ||
+    !ticket.assignedAt ||
+    !ticket.reason
+  ) {
+    throw new Error('Assigned ticket is missing required assignment fields');
+  }
+
+  return {
+    ticketId: ticket.id,
+    assignedAgentId: ticket.assignedAgentId,
+    assignedAt: ticket.assignedAt.toISOString(),
+    status: ticket.status,
+    reason: ticket.reason,
+  };
+}
+
+function toCloseResponse(ticket: Ticket): CloseTicketResponse {
+  if (ticket.status !== 'closed' || !ticket.closedAt) {
+    throw new Error('Closed ticket is missing closedAt');
+  }
+
+  return {
+    ticketId: ticket.id,
+    status: 'closed',
+    closedAt: ticket.closedAt.toISOString(),
+  };
+}
+
 export async function getTickets(
-  req: Request<TicketParams>,
+  req: Request<CompanyParams>,
   res: Response<GetTicketsResponse>,
-  next: NextFunction) {
+  next: NextFunction
+) {
   try {
     const { companyId } = req.params;
-    if(typeof companyId !== 'string') {
-      throw new ApiError('BAD_REQUEST', 'companyId must be a string');
-    }
-
-    const company: Company | null = await CompanyRepository.findById(companyId);
-    if (!company) {
-      throw new ApiError('NOT_FOUND', 'Company not found');
-    }
-    const tickets = await TicketRepository.findByCompany(companyId);
+    const tickets = await TicketService.listTickets(companyId);
     res.status(200).json({ tickets: tickets.map(toTicketDTO) });
+  } catch (err) {
+    next(err);
+  }
+}
 
-  } catch (error) {
-    next(error);
+export async function assignTicket(
+  req: Request<TicketParams>,
+  res: Response<AssignTicketResponse>,
+  next: NextFunction
+) {
+  try {
+    const { companyId, ticketId } = req.params;
+    const ticket = await TicketService.assignTicket(companyId, ticketId);
+    res.status(200).json(toAssignResponse(ticket));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function closeTicket(
+  req: Request<TicketParams>,
+  res: Response<CloseTicketResponse>,
+  next: NextFunction
+) {
+  try {
+    const { companyId, ticketId } = req.params;
+    const ticket = await TicketService.closeTicket(companyId, ticketId);
+    res.status(200).json(toCloseResponse(ticket));
+  } catch (err) {
+    next(err);
   }
 }

@@ -54,7 +54,7 @@ describe('GET /companies/:companyId/tickets', () => {
           status: 'assigned',
           assignedAgentId: '22222222-2222-2222-2222-222222222221',
           assignedAt: '2026-07-20T10:00:00.000Z',
-          reason: 'Lowest ticket density among available agents',
+          reason: 'Assigned based on availability and lowest ticket density',
           closedAt: null,
         },
       ],

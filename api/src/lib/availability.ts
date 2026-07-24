@@ -121,3 +121,62 @@ export function localWindowsToUtc(
 ): UtcAvailabilityWindow[] {
   return mergeLocalWindows(windows).map((window) => localWindowToUtc(window, utcOffsetMinutes));
 }
+
+/** Floor `date` to its minute within the recurring UTC week (Sunday 00:00 = 0). */
+export function utcDateToWeekMinute(date: Date): number {
+  return (
+    date.getUTCDay() * MINUTES_PER_DAY +
+    date.getUTCHours() * 60 +
+    date.getUTCMinutes()
+  );
+}
+
+/**
+ * Half-open circular check: available when elapsed time since window start
+ * is strictly less than duration.
+ */
+export function isCurrentlyAvailable(
+  windows: UtcAvailabilityWindow[],
+  now: Date
+): boolean {
+  const nowMinuteUtc = utcDateToWeekMinute(now);
+
+  for (const window of windows) {
+    const elapsed = normalizeWeekMinute(nowMinuteUtc - window.startMinuteUtc);
+    if (elapsed < window.durationMinutes) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Earliest instant at or after `now` when any window covers the agent.
+ * Returns `now` when currently available.
+ * Callers must only use this for agents that have at least one window.
+ */
+export function computeNextWindowStart(
+  windows: UtcAvailabilityWindow[],
+  now: Date
+): Date {
+  if (windows.length === 0) {
+    throw new Error('computeNextWindowStart requires at least one window');
+  }
+
+  if (isCurrentlyAvailable(windows, now)) {
+    return now;
+  }
+
+  const nowMinuteUtc = utcDateToWeekMinute(now);
+  let smallestDelta = MINUTES_PER_WEEK;
+
+  for (const window of windows) {
+    const delta = normalizeWeekMinute(window.startMinuteUtc - nowMinuteUtc);
+    if (delta < smallestDelta) {
+      smallestDelta = delta;
+    }
+  }
+
+  return new Date(now.getTime() + smallestDelta * 60_000);
+}

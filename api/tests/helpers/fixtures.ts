@@ -2,10 +2,16 @@ import type { Agent, AgentWithWorkload, Company, Ticket } from '../../src/types/
 
 export const COMPANY_ID = '11111111-1111-1111-1111-111111111111';
 export const AGENT_ID = '22222222-2222-2222-2222-222222222221';
+export const AGENT_B_ID = '22222222-2222-2222-2222-222222222222';
+export const TICKET_ID = '33333333-3333-3333-3333-333333333331';
+export const ASSIGNED_TICKET_ID = '33333333-3333-3333-3333-333333333332';
+export const CLOSED_TICKET_ID = '33333333-3333-3333-3333-333333333333';
 export const UNKNOWN_COMPANY_ID = '99999999-9999-9999-9999-999999999999';
 export const UNKNOWN_AGENT_ID = '88888888-8888-8888-8888-888888888888';
+export const UNKNOWN_TICKET_ID = '77777777-7777-7777-7777-777777777777';
 export const MALFORMED_COMPANY_ID = 'not-a-uuid';
 export const MALFORMED_AGENT_ID = 'also-not-a-uuid';
+export const MALFORMED_TICKET_ID = 'not-a-ticket-uuid';
 
 export const company: Company = {
   id: COMPANY_ID,
@@ -41,23 +47,34 @@ export const agentsWithWorkload: AgentWithWorkload[] = [
   },
 ];
 
-export const tickets: Ticket[] = [
-  {
-    id: '33333333-3333-3333-3333-333333333331',
-    companyId: COMPANY_ID,
-    status: 'unassigned',
-    assignedAgentId: null,
-    assignedAt: null,
-    reason: null,
-    closedAt: null,
-  },
-  {
-    id: '33333333-3333-3333-3333-333333333332',
-    companyId: COMPANY_ID,
-    status: 'assigned',
-    assignedAgentId: AGENT_ID,
-    assignedAt: new Date('2026-07-20T10:00:00.000Z'),
-    reason: 'Lowest ticket density among available agents',
-    closedAt: null,
-  },
-];
+export const unassignedTicket: Ticket = {
+  id: TICKET_ID,
+  companyId: COMPANY_ID,
+  status: 'unassigned',
+  assignedAgentId: null,
+  assignedAt: null,
+  reason: null,
+  closedAt: null,
+};
+
+export const assignedTicket: Ticket = {
+  id: ASSIGNED_TICKET_ID,
+  companyId: COMPANY_ID,
+  status: 'assigned',
+  assignedAgentId: AGENT_ID,
+  assignedAt: new Date('2026-07-20T10:00:00.000Z'),
+  reason: 'Assigned based on availability and lowest ticket density',
+  closedAt: null,
+};
+
+export const closedTicket: Ticket = {
+  id: CLOSED_TICKET_ID,
+  companyId: COMPANY_ID,
+  status: 'closed',
+  assignedAgentId: AGENT_ID,
+  assignedAt: new Date('2026-07-20T10:00:00.000Z'),
+  reason: 'Assigned based on availability and lowest ticket density',
+  closedAt: new Date('2026-07-20T12:00:00.000Z'),
+};
+
+export const tickets: Ticket[] = [unassignedTicket, assignedTicket];

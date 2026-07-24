@@ -13,6 +13,20 @@ export interface GetTicketsResponse {
   tickets: TicketDTO[];
 }
 
+export interface AssignTicketResponse {
+  ticketId: string;
+  assignedAgentId: string;
+  assignedAt: string;
+  status: 'assigned' | 'closed';
+  reason: string;
+}
+
+export interface CloseTicketResponse {
+  ticketId: string;
+  status: 'closed';
+  closedAt: string;
+}
+
 interface AvailabilityWindowResponse {
   startMinuteUtc: number;
   durationMinutes: number;
