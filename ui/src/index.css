@@ -1,1 +1,55 @@
 @import "tailwindcss";
+
+@theme {
+  --color-ink: #161B22;
+  --color-panel: #1F2630;
+  --color-paper: #E8E4D9;
+
+  --color-line: #2C333E;
+  --color-line-on-paper: #C9C3B2;
+
+  --color-text: #E7E9EC;
+  --color-text-muted: #8B94A3;
+  --color-ink-on-paper: #23262B;
+  --color-ink-on-paper-muted: #6B675C;
+
+  --color-amber: #E8A33D;
+  --color-amber-dim: #4A3A22;
+  --color-sage: #6FA98B;
+  --color-sage-dim: #253A31;
+  --color-rust: #C1483F;
+  --color-rust-dim: #3D2220;
+
+  --font-display: "Big Shoulders Condensed", sans-serif;
+  --font-body: "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+
+  --radius-card: 10px;
+  --radius-pill: 999px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-ink);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.gap-hatch {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-rust) 0 4px,
+    var(--color-rust-dim) 4px 8px
+  );
+}
