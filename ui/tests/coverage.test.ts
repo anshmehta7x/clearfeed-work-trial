@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent, AvailabilityWindow } from '../src/types';
-import { isSlotCovered } from '../src/lib/coverage';
+import { isAgentAvailableInSlot, isSlotCovered } from '../src/lib/coverage';
 
 let agentNumber = 0;
 
@@ -17,6 +17,16 @@ function agent(windows: AvailabilityWindow[]): Agent {
     availabilityWindows: windows,
   };
 }
+
+describe('agent slot rendering', () => {
+  it('shows a slot when any portion overlaps an agent window', () => {
+    const partial = agent([{ startMinuteUtc: 15, durationMinutes: 30 }]);
+
+    expect(isAgentAvailableInSlot(partial, 0, 0)).toBe(true);
+    expect(isAgentAvailableInSlot(partial, 1, 0)).toBe(true);
+    expect(isAgentAvailableInSlot(partial, 2, 0)).toBe(false);
+  });
+});
 
 describe('isSlotCovered', () => {
   it('rejects a partially covered 30-minute slot', () => {

@@ -62,6 +62,20 @@ export function formatMinuteOfDay(minutes: number): string {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 }
 
+/** Parse an HH:MM wall-clock value. Only end times may use the 24:00 boundary. */
+export function parseTimeOfDay(value: string, allowEndOfDay = false): number | null {
+  const match = /^(\d{2}):(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (minutes > 59) return null;
+  if (hours === 24) return allowEndOfDay && minutes === 0 ? MINUTES_PER_DAY : null;
+  if (hours > 23) return null;
+
+  return hours * 60 + minutes;
+}
+
 export function utcWindowToLocal(
   window: AvailabilityWindow,
   utcOffsetMinutes: number,

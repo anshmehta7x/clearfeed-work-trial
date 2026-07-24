@@ -31,7 +31,7 @@ export default class AgentService {
   static async updateAvailability(
     companyId: string,
     agentId: string,
-    input: { utcOffsetMinutes: unknown; windows: unknown }
+    input: unknown
   ): Promise<AgentWithWorkload> {
     const company = await CompanyRepository.findById(companyId);
     if (!company) {
@@ -43,15 +43,20 @@ export default class AgentService {
       throw new ApiError('NOT_FOUND', 'Agent not found');
     }
 
-    assertValidUtcOffset(input.utcOffsetMinutes);
-    assertValidLocalWindows(input.windows);
+    if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+      throw new ApiError('BAD_REQUEST', 'Request body must be an object');
+    }
 
-    const utcWindows = localWindowsToUtc(input.windows, input.utcOffsetMinutes);
+    const { utcOffsetMinutes, windows } = input as Record<string, unknown>;
+    assertValidUtcOffset(utcOffsetMinutes);
+    assertValidLocalWindows(windows);
+
+    const utcWindows = localWindowsToUtc(windows, utcOffsetMinutes);
 
     const replaced = await AgentRepository.replaceAvailability(
       companyId,
       agentId,
-      input.utcOffsetMinutes,
+      utcOffsetMinutes,
       utcWindows
     );
     if (!replaced) {

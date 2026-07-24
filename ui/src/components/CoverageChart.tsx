@@ -163,7 +163,7 @@ export function CoverageChart({ agents }: CoverageChartProps) {
   return (
     <section id="coverage" className="py-10 scroll-mt-4">
       <div className="max-w-[1100px] mx-auto px-8">
-        <h2 className="text-2xl">Coverage — Week View</h2>
+        <h2 className="text-2xl">Coverage</h2>
         <p className="text-xs text-text-muted font-mono mt-1 mb-5">
           Browser time: {formatOffset(browserOffset)} · 30-minute slots · 7 days
         </p>

@@ -1,10 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import {
+  parseTimeOfDay,
   utcWindowToLocal,
   utcWindowsToLocal,
   validateEditableWindows,
   type EditableWindow,
 } from '../src/lib/schedule';
+
+describe('parseTimeOfDay', () => {
+  it('accepts minute-precision times and the end-of-day boundary', () => {
+    expect(parseTimeOfDay('09:17')).toBe(557);
+    expect(parseTimeOfDay('24:00', true)).toBe(1440);
+  });
+
+  it('rejects malformed and out-of-range times', () => {
+    expect(parseTimeOfDay('9:17')).toBeNull();
+    expect(parseTimeOfDay('23:60')).toBeNull();
+    expect(parseTimeOfDay('24:00')).toBeNull();
+    expect(parseTimeOfDay('24:01', true)).toBeNull();
+  });
+});
 
 describe('utcWindowToLocal', () => {
   it('converts a UTC window to the agent local timezone', () => {

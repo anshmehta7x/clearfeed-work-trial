@@ -22,7 +22,9 @@ export function AgentCard({ agent, activeTickets, onEditAvailability }: AgentCar
     <article className="bg-panel border border-line rounded-[var(--radius-card)] p-[18px] flex flex-col">
       <div className="flex justify-between items-baseline mb-2.5">
         <span className="font-semibold text-base">{agent.name}</span>
-        <span className="font-mono text-xs text-text-muted">{shortAgentId(agent.id)}</span>
+        <span className="font-mono text-xs text-text-muted" title={`Agent ID: ${agent.id}`}>
+          {shortAgentId(agent.id)}
+        </span>
       </div>
 
       <p className="font-mono text-xs text-text-muted mb-2">
@@ -56,7 +58,11 @@ export function AgentCard({ agent, activeTickets, onEditAvailability }: AgentCar
         ) : (
           <ul className="space-y-1 max-h-24 overflow-y-auto pr-1">
             {activeTickets.map((ticket) => (
-              <li key={ticket.id} className="font-mono text-xs text-text-muted truncate">
+              <li
+                key={ticket.id}
+                className="font-mono text-xs text-text-muted truncate"
+                title={`Ticket ID: ${ticket.id}${ticket.reason ? ` · ${ticket.reason}` : ''}`}
+              >
                 {shortAgentId(ticket.id).replace('#', '#T-')}
                 {ticket.reason ? (
                   <span className="italic ml-1 opacity-80">· {ticket.reason}</span>

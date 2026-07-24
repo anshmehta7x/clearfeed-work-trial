@@ -122,6 +122,20 @@ describe('PUT /companies/:companyId/agents/:agentId/availability', () => {
     expect(findCompanyById).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when the request body is missing', async () => {
+    findCompanyById.mockResolvedValue(company);
+    findAgentById.mockResolvedValue(agentA);
+
+    const res = await request(app).put(availabilityUrl(COMPANY_ID, AGENT_ID));
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      error: 'Request body must be an object',
+      code: 'BAD_REQUEST',
+    });
+    expect(replaceAvailability).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for an invalid utcOffsetMinutes', async () => {
     findCompanyById.mockResolvedValue(company);
     findAgentById.mockResolvedValue(agentA);

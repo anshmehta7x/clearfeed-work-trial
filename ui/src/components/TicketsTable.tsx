@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import type { Agent, Ticket } from '../types';
 import { shortAgentId } from '../lib/workload';
 import { StatusPill } from './StatusPill';
@@ -29,6 +29,7 @@ function formatAssignedAt(iso: string | null): string {
 
 export function TicketsTable({ tickets, agents, onAssign, onClose }: TicketsTableProps) {
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const actionLocked = useRef(false);
 
@@ -86,15 +87,24 @@ export function TicketsTable({ tickets, agents, onAssign, onClose }: TicketsTabl
                 tickets.map((ticket) => {
                   const busy = busyId === ticket.id;
                   const actionsDisabled = busyId !== null;
+                  const expanded = expandedId === ticket.id;
+                  const detailsId = `ticket-details-${ticket.id}`;
                   return (
-                    <tr key={ticket.id}>
-                      <td className="font-mono px-3 py-3 border-b border-line align-middle">
+                    <Fragment key={ticket.id}>
+                    <tr>
+                      <td
+                        className="font-mono px-3 py-3 border-b border-line align-middle"
+                        title={`Ticket ID: ${ticket.id}`}
+                      >
                         {shortAgentId(ticket.id).replace('#', '#T-')}
                       </td>
                       <td className="px-3 py-3 border-b border-line align-middle">
                         <StatusPill status={ticket.status} />
                       </td>
-                      <td className="font-mono px-3 py-3 border-b border-line align-middle whitespace-nowrap">
+                      <td
+                        className="font-mono px-3 py-3 border-b border-line align-middle whitespace-nowrap"
+                        title={ticket.assignedAgentId ? `Agent ID: ${ticket.assignedAgentId}` : undefined}
+                      >
                         {agentLabel(agents, ticket.assignedAgentId)}
                       </td>
                       <td className="font-mono px-3 py-3 border-b border-line align-middle whitespace-nowrap text-text-muted">
@@ -104,6 +114,7 @@ export function TicketsTable({ tickets, agents, onAssign, onClose }: TicketsTabl
                         {ticket.reason ?? '—'}
                       </td>
                       <td className="px-3 py-3 border-b border-line align-middle text-right whitespace-nowrap">
+                        <div className="flex justify-end gap-2">
                         {ticket.status === 'unassigned' && (
                           <button
                             type="button"
@@ -124,8 +135,49 @@ export function TicketsTable({ tickets, agents, onAssign, onClose }: TicketsTabl
                             {busy ? '…' : 'Close'}
                           </button>
                         )}
+                        {ticket.status !== 'unassigned' && (
+                          <button
+                            type="button"
+                            aria-expanded={expanded}
+                            aria-controls={detailsId}
+                            onClick={() => setExpandedId(expanded ? null : ticket.id)}
+                            className="bg-transparent border border-line text-text-muted px-3.5 py-1.5 rounded-md cursor-pointer"
+                          >
+                            {expanded ? 'Hide details' : 'Details'}
+                          </button>
+                        )}
+                        </div>
                       </td>
                     </tr>
+                    {expanded && (
+                      <tr>
+                        <td id={detailsId} colSpan={6} className="px-4 py-4 border-b border-line bg-ink/40">
+                          <dl className="grid gap-2 text-left sm:grid-cols-2">
+                            <div>
+                              <dt className="font-mono text-[10px] uppercase text-text-muted">Ticket ID</dt>
+                              <dd className="font-mono break-all">{ticket.id}</dd>
+                            </div>
+                            <div>
+                              <dt className="font-mono text-[10px] uppercase text-text-muted">Agent ID</dt>
+                              <dd className="font-mono break-all">{ticket.assignedAgentId ?? '—'}</dd>
+                            </div>
+                            <div>
+                              <dt className="font-mono text-[10px] uppercase text-text-muted">Assigned at</dt>
+                              <dd>{ticket.assignedAt ? new Date(ticket.assignedAt).toLocaleString() : '—'}</dd>
+                            </div>
+                            <div>
+                              <dt className="font-mono text-[10px] uppercase text-text-muted">Closed at</dt>
+                              <dd>{ticket.closedAt ? new Date(ticket.closedAt).toLocaleString() : '—'}</dd>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <dt className="font-mono text-[10px] uppercase text-text-muted">Assignment reason</dt>
+                              <dd className="whitespace-normal">{ticket.reason ?? '—'}</dd>
+                            </div>
+                          </dl>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })
               )}

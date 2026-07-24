@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react';
 import type { Agent, LocalAvailabilityWindow } from '../types';
 import {
   DAY_NAMES,
-  END_TIME_OPTIONS,
-  START_TIME_OPTIONS,
   UTC_OFFSET_OPTIONS,
   createEditableWindow,
   formatMinuteOfDay,
+  parseTimeOfDay,
   toEditableWindows,
   validateEditableWindows,
   type EditableWindow,
@@ -27,6 +26,14 @@ export function EditAvailabilityModal({ agent, onClose, onSave }: EditAvailabili
   const [windows, setWindows] = useState<EditableWindow[]>(() =>
     toEditableWindows(agent.availabilityWindows, agent.utcOffsetMinutes),
   );
+  const [timeDrafts, setTimeDrafts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      windows.flatMap((window) => [
+        [`${window.key}:start`, formatMinuteOfDay(window.startMinute)],
+        [`${window.key}:end`, formatMinuteOfDay(window.endMinute)],
+      ]),
+    ),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,20 +45,43 @@ export function EditAvailabilityModal({ agent, onClose, onSave }: EditAvailabili
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, saving]);
 
-  function updateWindow(key: string, patch: Partial<EditableWindow>) {
-    setWindows((prev) => prev.map((w) => (w.key === key ? { ...w, ...patch } : w)));
+  function updateTimeDraft(key: string, field: 'start' | 'end', value: string) {
+    setTimeDrafts((prev) => ({ ...prev, [`${key}:${field}`]: value }));
   }
 
   function removeWindow(key: string) {
     setWindows((prev) => prev.filter((w) => w.key !== key));
+    setTimeDrafts((prev) => {
+      const next = { ...prev };
+      delete next[`${key}:start`];
+      delete next[`${key}:end`];
+      return next;
+    });
   }
 
   function addWindow(dayOfWeek: number) {
-    setWindows((prev) => [...prev, createEditableWindow(dayOfWeek)]);
+    const window = createEditableWindow(dayOfWeek);
+    setWindows((prev) => [...prev, window]);
+    setTimeDrafts((prev) => ({
+      ...prev,
+      [`${window.key}:start`]: formatMinuteOfDay(window.startMinute),
+      [`${window.key}:end`]: formatMinuteOfDay(window.endMinute),
+    }));
   }
 
   async function handleSave() {
-    const validationError = validateEditableWindows(windows);
+    const parsedWindows: EditableWindow[] = [];
+    for (const window of windows) {
+      const startMinute = parseTimeOfDay(timeDrafts[`${window.key}:start`] ?? '');
+      const endMinute = parseTimeOfDay(timeDrafts[`${window.key}:end`] ?? '', true);
+      if (startMinute === null || endMinute === null) {
+        setError(`${DAY_NAMES[window.dayOfWeek]}: enter times as HH:MM (end may be 24:00)`);
+        return;
+      }
+      parsedWindows.push({ ...window, startMinute, endMinute });
+    }
+
+    const validationError = validateEditableWindows(parsedWindows);
     if (validationError) {
       setError(validationError);
       return;
@@ -60,7 +90,7 @@ export function EditAvailabilityModal({ agent, onClose, onSave }: EditAvailabili
     setSaving(true);
     setError(null);
     try {
-      const payload: LocalAvailabilityWindow[] = windows.map(
+      const payload: LocalAvailabilityWindow[] = parsedWindows.map(
         ({ dayOfWeek, startMinute, endMinute }) => ({
           dayOfWeek,
           startMinute,
@@ -149,46 +179,33 @@ export function EditAvailabilityModal({ agent, onClose, onSave }: EditAvailabili
                     <p className="text-xs text-text-muted italic">No windows</p>
                   ) : (
                     <ul className="space-y-2">
-                      {dayWindows.map((w) => {
-                        const startOptions = START_TIME_OPTIONS.includes(w.startMinute)
-                          ? START_TIME_OPTIONS
-                          : [...START_TIME_OPTIONS, w.startMinute].sort((a, b) => a - b);
-                        const endOptions = END_TIME_OPTIONS.includes(w.endMinute)
-                          ? END_TIME_OPTIONS
-                          : [...END_TIME_OPTIONS, w.endMinute].sort((a, b) => a - b);
-
+                      {dayWindows.map((w, windowIndex) => {
+                        const windowNumber = windowIndex + 1;
                         return (
                           <li key={w.key} className="flex flex-wrap items-center gap-2">
-                            <select
-                              value={w.startMinute}
-                              onChange={(e) =>
-                                updateWindow(w.key, { startMinute: Number(e.target.value) })
-                              }
-                              className="bg-ink border border-line rounded-md px-2 py-1.5 font-mono text-xs"
-                            >
-                              {startOptions.map((m) => (
-                                <option key={m} value={m}>
-                                  {formatMinuteOfDay(m)}
-                                </option>
-                              ))}
-                            </select>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="HH:MM"
+                              aria-label={`${dayName} window ${windowNumber} start time`}
+                              value={timeDrafts[`${w.key}:start`] ?? ''}
+                              onChange={(e) => updateTimeDraft(w.key, 'start', e.target.value)}
+                              className="w-20 bg-ink border border-line rounded-md px-2 py-1.5 font-mono text-xs"
+                            />
                             <span className="text-text-muted text-xs">to</span>
-                            <select
-                              value={w.endMinute}
-                              onChange={(e) =>
-                                updateWindow(w.key, { endMinute: Number(e.target.value) })
-                              }
-                              className="bg-ink border border-line rounded-md px-2 py-1.5 font-mono text-xs"
-                            >
-                              {endOptions.map((m) => (
-                                <option key={m} value={m}>
-                                  {formatMinuteOfDay(m)}
-                                </option>
-                              ))}
-                            </select>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="HH:MM"
+                              aria-label={`${dayName} window ${windowNumber} end time`}
+                              value={timeDrafts[`${w.key}:end`] ?? ''}
+                              onChange={(e) => updateTimeDraft(w.key, 'end', e.target.value)}
+                              className="w-20 bg-ink border border-line rounded-md px-2 py-1.5 font-mono text-xs"
+                            />
                             <button
                               type="button"
                               onClick={() => removeWindow(w.key)}
+                              aria-label={`Remove ${dayName} window ${windowNumber}`}
                               className="ml-auto text-rust text-xs font-semibold hover:underline"
                             >
                               Remove

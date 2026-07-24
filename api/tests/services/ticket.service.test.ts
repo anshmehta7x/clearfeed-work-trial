@@ -190,7 +190,7 @@ describe('selectAgentForAssignment', () => {
 
     expect(choice.agent.id).toBe(AGENT_ID);
     expect(choice.reason).toMatch(
-      /^Last resort: no availability configured; fewest active tickets \(2\)/
+      /^Last resort: no availability configured, so availability and capacity could not be respected; fewest active tickets \(2\)/
     );
   });
 

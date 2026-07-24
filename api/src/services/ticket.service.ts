@@ -129,16 +129,16 @@ function lastResortReason(selected: AgentWithWorkload, agents: AgentWithWorkload
   const count = selected.activeTicketCount;
   const countTies = agents.filter((a) => a.activeTicketCount === count);
   if (countTies.length === 1) {
-    return `Last resort: no availability configured; fewest active tickets (${count}); assigned to guarantee ownership`;
+    return `Last resort: no availability configured, so availability and capacity could not be respected; fewest active tickets (${count}); assigned to guarantee ownership`;
   }
 
   const lastKey = lastAssignedSortKey(selected);
   const lastTies = countTies.filter((a) => lastAssignedSortKey(a) === lastKey);
   if (lastTies.length === 1) {
-    return `Last resort: no availability configured; tied on active tickets (${count}), least recently assigned; assigned to guarantee ownership`;
+    return `Last resort: no availability configured, so availability and capacity could not be respected; tied on active tickets (${count}), least recently assigned; assigned to guarantee ownership`;
   }
 
-  return `Last resort: no availability configured; tied on active tickets and last assignment, lowest agent ID; assigned to guarantee ownership`;
+  return `Last resort: no availability configured, so availability and capacity could not be respected; tied on active tickets and last assignment, lowest agent ID; assigned to guarantee ownership`;
 }
 
 /**

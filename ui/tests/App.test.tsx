@@ -87,7 +87,7 @@ describe('dashboard flows', () => {
     render(<App />);
 
     expect((await screen.findAllByText('Agent A')).length).toBeGreaterThan(0);
-    expect(screen.getByRole('heading', { name: 'Coverage — Week View' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Coverage' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Agents' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Tickets' })).toBeInTheDocument();
     expect(screen.getAllByText('Unassigned').length).toBeGreaterThan(0);
@@ -111,6 +111,18 @@ describe('dashboard flows', () => {
     });
     expect((await screen.findAllByText('Assigned')).length).toBeGreaterThan(0);
     expect(screen.getAllByText(assignedTicket.reason!).length).toBeGreaterThan(0);
+
+    const ticketIdCell = screen
+      .getAllByText('#T-3331')
+      .find((element) => element.getAttribute('title') === `Ticket ID: ${TICKET_ID}`);
+    expect(ticketIdCell).toBeDefined();
+    await user.click(screen.getByRole('button', { name: 'Details' }));
+    expect(screen.getByText(TICKET_ID)).toBeInTheDocument();
+    expect(screen.getByText(AGENT_ID)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hide details' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
   });
 
   it('closes an assigned ticket and refreshes active workload', async () => {
@@ -146,11 +158,15 @@ describe('dashboard flows', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Edit availability' }));
     const dialog = screen.getByRole('dialog', { name: 'Edit availability' });
-    const selects = within(dialog).getAllByRole('combobox');
+    const timezone = within(dialog).getByRole('combobox', { name: /Timezone/ });
+    const startTime = within(dialog).getByRole('textbox', { name: 'Sunday window 1 start time' });
+    const endTime = within(dialog).getByRole('textbox', { name: 'Sunday window 1 end time' });
 
-    await user.selectOptions(selects[0]!, '60');
-    await user.selectOptions(selects[1]!, '600');
-    await user.selectOptions(selects[2]!, '1080');
+    await user.selectOptions(timezone, '60');
+    await user.clear(startTime);
+    await user.type(startTime, '10:07');
+    await user.clear(endTime);
+    await user.type(endTime, '18:13');
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
@@ -159,7 +175,7 @@ describe('dashboard flows', () => {
         AGENT_ID,
         {
           utcOffsetMinutes: 60,
-          windows: [{ dayOfWeek: 0, startMinute: 600, endMinute: 1080 }],
+          windows: [{ dayOfWeek: 0, startMinute: 607, endMinute: 1093 }],
         },
       );
       expect(mockGetAgents).toHaveBeenCalledTimes(2);

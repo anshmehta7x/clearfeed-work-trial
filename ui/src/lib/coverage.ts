@@ -41,6 +41,7 @@ function isAgentAvailableAtUtcMinute(agent: Agent, utcMinute: number): boolean {
   );
 }
 
+/** Whether any part of a display slot overlaps an agent's availability. */
 export function isAgentAvailableInSlot(
   agent: Agent,
   slotIndex: number,
@@ -48,9 +49,9 @@ export function isAgentAvailableInSlot(
 ): boolean {
   for (let minute = 0; minute < SLOT_MINUTES; minute += 1) {
     const utcMinute = slotMinuteUtc(slotIndex, minute, browserOffsetMinutes);
-    if (!isAgentAvailableAtUtcMinute(agent, utcMinute)) return false;
+    if (isAgentAvailableAtUtcMinute(agent, utcMinute)) return true;
   }
-  return true;
+  return false;
 }
 
 export function isSlotCovered(
