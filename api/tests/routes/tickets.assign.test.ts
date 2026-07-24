@@ -16,7 +16,6 @@ import {
   company,
   unassignedTicket,
 } from '../helpers/fixtures.js';
-import { ASSIGN_REASON_ELIGIBLE } from '../../src/services/ticket.service.js';
 
 vi.mock('../../src/repositories/company.repository.js', () => ({
   default: {
@@ -74,12 +73,13 @@ describe('POST /companies/:companyId/tickets/:ticketId/assign', () => {
       activeCountByAgent: new Map([[AGENT_ID, 0]]),
     });
 
+    const expectedReason = 'Available; lowest ticket density (0.000)';
     const claimed = {
       ...unassignedTicket,
       status: 'assigned' as const,
       assignedAgentId: AGENT_ID,
       assignedAt: new Date('2026-07-20T10:00:00.000Z'),
-      reason: ASSIGN_REASON_ELIGIBLE,
+      reason: expectedReason,
     };
     claimAssignment.mockResolvedValue(claimed);
 
@@ -91,14 +91,14 @@ describe('POST /companies/:companyId/tickets/:ticketId/assign', () => {
       assignedAgentId: AGENT_ID,
       assignedAt: '2026-07-20T10:00:00.000Z',
       status: 'assigned',
-      reason: ASSIGN_REASON_ELIGIBLE,
+      reason: expectedReason,
     });
     expect(claimAssignment).toHaveBeenCalledWith(
       COMPANY_ID,
       TICKET_ID,
       AGENT_ID,
       new Date('2026-07-20T10:00:00.000Z'),
-      ASSIGN_REASON_ELIGIBLE
+      expectedReason
     );
   });
 

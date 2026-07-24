@@ -11,12 +11,9 @@ import { ApiError } from '../types/errors.js';
 
 export const MAX_DENSITY_THRESHOLD = 0.25;
 
-export const ASSIGN_REASON_ELIGIBLE =
-  'Assigned based on availability and lowest ticket density';
-export const ASSIGN_REASON_FALLBACK =
-  'Fallback: assigned outside eligibility (capacity and/or availability) to guarantee ownership';
-export const ASSIGN_REASON_LAST_RESORT =
-  'Last resort: no availability configured; assigned to guarantee ownership';
+export const ASSIGN_REASON_ELIGIBLE = 'Available';
+export const ASSIGN_REASON_FALLBACK = 'Fallback:';
+export const ASSIGN_REASON_LAST_RESORT = 'Last resort:';
 
 export interface AssignmentChoice {
   agent: AgentWithWorkload;
@@ -65,6 +62,85 @@ function lastAssignedSortKey(agent: AgentWithWorkload): number {
   return agent.lastAssignedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
 }
 
+function formatDensity(density: number | null): string {
+  if (density === null) return 'n/a';
+  return density.toFixed(3);
+}
+
+function eligibleReason(selected: AgentWithWorkload, eligible: AgentWithWorkload[]): string {
+  const density = selected.ticketDensity as number;
+  const densityTies = eligible.filter((a) => a.ticketDensity === density);
+  if (densityTies.length === 1) {
+    return `Available; lowest ticket density (${formatDensity(density)})`;
+  }
+
+  const lastKey = lastAssignedSortKey(selected);
+  const lastTies = densityTies.filter((a) => lastAssignedSortKey(a) === lastKey);
+  if (lastTies.length === 1) {
+    return `Available; tied on density (${formatDensity(density)}), least recently assigned`;
+  }
+
+  return `Available; tied on density (${formatDensity(density)}) and last assignment, lowest agent ID`;
+}
+
+function fallbackReason(
+  selected: AgentWithWorkload,
+  nextWindowStart: Date,
+  candidates: Array<{ agent: AgentWithWorkload; nextWindowStart: Date }>,
+  now: Date
+): string {
+  const availableNow = isCurrentlyAvailable(selected.availabilityWindows, now);
+  const overThreshold =
+    selected.ticketDensity !== null && selected.ticketDensity >= MAX_DENSITY_THRESHOLD;
+
+  let situation: string;
+  if (availableNow && overThreshold) {
+    situation = `available but at/above density threshold (${formatDensity(selected.ticketDensity)})`;
+  } else if (availableNow) {
+    situation = 'outside eligibility';
+  } else {
+    situation = 'not currently available; next window soonest';
+  }
+
+  const soonest = nextWindowStart.getTime();
+  const soonestTies = candidates.filter((c) => c.nextWindowStart.getTime() === soonest);
+  if (soonestTies.length === 1) {
+    return `Fallback: ${situation}; assigned to guarantee ownership`;
+  }
+
+  const density = selected.ticketDensity ?? Number.POSITIVE_INFINITY;
+  const densityTies = soonestTies.filter(
+    (c) => (c.agent.ticketDensity ?? Number.POSITIVE_INFINITY) === density
+  );
+  if (densityTies.length === 1) {
+    return `Fallback: ${situation}; tied on next window, lowest density (${formatDensity(selected.ticketDensity)}); assigned to guarantee ownership`;
+  }
+
+  const lastKey = lastAssignedSortKey(selected);
+  const lastTies = densityTies.filter((c) => lastAssignedSortKey(c.agent) === lastKey);
+  if (lastTies.length === 1) {
+    return `Fallback: ${situation}; tied on next window and density, least recently assigned; assigned to guarantee ownership`;
+  }
+
+  return `Fallback: ${situation}; tied on next window, density, and last assignment, lowest agent ID; assigned to guarantee ownership`;
+}
+
+function lastResortReason(selected: AgentWithWorkload, agents: AgentWithWorkload[]): string {
+  const count = selected.activeTicketCount;
+  const countTies = agents.filter((a) => a.activeTicketCount === count);
+  if (countTies.length === 1) {
+    return `Last resort: no availability configured; fewest active tickets (${count}); assigned to guarantee ownership`;
+  }
+
+  const lastKey = lastAssignedSortKey(selected);
+  const lastTies = countTies.filter((a) => lastAssignedSortKey(a) === lastKey);
+  if (lastTies.length === 1) {
+    return `Last resort: no availability configured; tied on active tickets (${count}), least recently assigned; assigned to guarantee ownership`;
+  }
+
+  return `Last resort: no availability configured; tied on active tickets and last assignment, lowest agent ID; assigned to guarantee ownership`;
+}
+
 /**
  * Pure selection for an unassigned ticket.
  * Exported for unit tests; callers must pass a non-empty agent list.
@@ -86,13 +162,14 @@ export function selectAgentForAssignment(
   );
 
   if (eligibleAgents.length > 0) {
+    const selected = pickBy(eligibleAgents, [
+      (a) => a.ticketDensity as number,
+      lastAssignedSortKey,
+      (a) => a.id,
+    ]);
     return {
-      agent: pickBy(eligibleAgents, [
-        (a) => a.ticketDensity as number,
-        lastAssignedSortKey,
-        (a) => a.id,
-      ]),
-      reason: ASSIGN_REASON_ELIGIBLE,
+      agent: selected,
+      reason: eligibleReason(selected, eligibleAgents),
     };
   }
 
@@ -113,17 +190,18 @@ export function selectAgentForAssignment(
 
     return {
       agent: selected.agent,
-      reason: ASSIGN_REASON_FALLBACK,
+      reason: fallbackReason(selected.agent, selected.nextWindowStart, withNextWindow, now),
     };
   }
 
+  const selected = pickBy(agents, [
+    (a) => a.activeTicketCount,
+    lastAssignedSortKey,
+    (a) => a.id,
+  ]);
   return {
-    agent: pickBy(agents, [
-      (a) => a.activeTicketCount,
-      lastAssignedSortKey,
-      (a) => a.id,
-    ]),
-    reason: ASSIGN_REASON_LAST_RESORT,
+    agent: selected,
+    reason: lastResortReason(selected, agents),
   };
 }
 

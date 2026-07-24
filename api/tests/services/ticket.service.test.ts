@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentWithWorkload } from '../../src/types/domain.js';
-import {
-  ASSIGN_REASON_ELIGIBLE,
-  ASSIGN_REASON_FALLBACK,
-  ASSIGN_REASON_LAST_RESORT,
-  selectAgentForAssignment,
-} from '../../src/services/ticket.service.js';
+import { selectAgentForAssignment } from '../../src/services/ticket.service.js';
 import { AGENT_B_ID, AGENT_ID, COMPANY_ID } from '../helpers/fixtures.js';
 
 const mondayTenAm = new Date('2026-07-20T10:00:00.000Z');
@@ -44,7 +39,7 @@ describe('selectAgentForAssignment', () => {
     const choice = selectAgentForAssignment(agents, mondayTenAm);
 
     expect(choice.agent.id).toBe(AGENT_B_ID);
-    expect(choice.reason).toBe(ASSIGN_REASON_ELIGIBLE);
+    expect(choice.reason).toBe('Available; lowest ticket density (0.100)');
   });
 
   it('tie-breaks eligible agents by least recently assigned, then id', () => {
@@ -62,7 +57,11 @@ describe('selectAgentForAssignment', () => {
       }),
     ];
 
-    expect(selectAgentForAssignment(agents, mondayTenAm).agent.id).toBe(AGENT_ID);
+    const choice = selectAgentForAssignment(agents, mondayTenAm);
+    expect(choice.agent.id).toBe(AGENT_ID);
+    expect(choice.reason).toBe(
+      'Available; tied on density (0.100), least recently assigned'
+    );
   });
 
   it('uses ascending id when eligible density and assignment time are tied', () => {
@@ -72,7 +71,11 @@ describe('selectAgentForAssignment', () => {
       agent({ id: AGENT_ID, ticketDensity: 0.1, lastAssignedAt: tiedAt }),
     ];
 
-    expect(selectAgentForAssignment(agents, mondayTenAm).agent.id).toBe(AGENT_ID);
+    const choice = selectAgentForAssignment(agents, mondayTenAm);
+    expect(choice.agent.id).toBe(AGENT_ID);
+    expect(choice.reason).toBe(
+      'Available; tied on density (0.100) and last assignment, lowest agent ID'
+    );
   });
 
   it('excludes agents at or above the density threshold from eligible path', () => {
@@ -112,7 +115,7 @@ describe('selectAgentForAssignment', () => {
     const choice = selectAgentForAssignment(agents, now);
 
     expect(choice.agent.id).toBe(AGENT_B_ID);
-    expect(choice.reason).toBe(ASSIGN_REASON_FALLBACK);
+    expect(choice.reason).toMatch(/^Fallback: not currently available; next window soonest/);
   });
 
   it('on fallback, prefers a currently working over-threshold agent (nextWindow = now)', () => {
@@ -133,7 +136,9 @@ describe('selectAgentForAssignment', () => {
     const choice = selectAgentForAssignment(agents, mondayTenAm);
 
     expect(choice.agent.id).toBe(AGENT_ID);
-    expect(choice.reason).toBe(ASSIGN_REASON_FALLBACK);
+    expect(choice.reason).toMatch(
+      /^Fallback: available but at\/above density threshold \(0\.500\)/
+    );
   });
 
   it('tie-breaks fallback by density, then assignment time, then id', () => {
@@ -184,7 +189,9 @@ describe('selectAgentForAssignment', () => {
     const choice = selectAgentForAssignment(agents, mondayTenAm);
 
     expect(choice.agent.id).toBe(AGENT_ID);
-    expect(choice.reason).toBe(ASSIGN_REASON_LAST_RESORT);
+    expect(choice.reason).toMatch(
+      /^Last resort: no availability configured; fewest active tickets \(2\)/
+    );
   });
 
   it('tie-breaks last resort by assignment time, then id', () => {
