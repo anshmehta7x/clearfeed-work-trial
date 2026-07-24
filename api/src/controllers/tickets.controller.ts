@@ -5,14 +5,10 @@ import { Company, Ticket} from '../types/domain.js';
 import {
   GetTicketsResponse,
   TicketDTO,
+  TicketParams,
 } from '../types/dto.js';
 import { ApiError } from '../types/errors.js';
-import { ParamsDictionary } from 'express-serve-static-core';
 
-
-interface CompanyParams extends ParamsDictionary {
-  companyId: string;
-}
 
 function toTicketDTO(ticket: Ticket): TicketDTO {
   return {
@@ -26,7 +22,7 @@ function toTicketDTO(ticket: Ticket): TicketDTO {
 }
 
 export async function getTickets(
-  req: Request<CompanyParams>,
+  req: Request<TicketParams>,
   res: Response<GetTicketsResponse>,
   next: NextFunction) {
   try {

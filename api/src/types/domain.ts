@@ -34,6 +34,6 @@ export interface Ticket {
 export interface AgentWithWorkload extends Agent {
   scheduledWeeklyHours: number;
   activeTicketCount: number;
-  ticketDensity: number;
+  ticketDensity: number | null;
   availabilityWindows: Pick<AvailabilityWindow, 'startMinuteUtc' | 'durationMinutes'>[];
 }
