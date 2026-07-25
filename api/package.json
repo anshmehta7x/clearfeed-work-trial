@@ -4,7 +4,7 @@
   "description": "",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc && cp -r src/db/migrations dist/db/migrations",
+    "build": "tsc && node scripts/copy-migrations.mjs",
     "start": "node dist/db/migrate.js up && node dist/index.js",
     "migrate:up": "tsx src/db/migrate.ts up",
     "migrate:down": "tsx src/db/migrate.ts down",

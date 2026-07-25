@@ -117,6 +117,11 @@ describe('PostgreSQL ticket concurrency', () => {
     const closingId = ticketId(200);
     const assigningId = ticketId(201);
     await insertTickets([assigningId]);
+
+    // A holds one active ticket that we will close.
+    // Same weekly hours + both always available:
+    //   old workload (A=1, B=0) → B (lower density)
+    //   new workload (A=0, B=0) → A (tied density, lowest ID)
     await pool.query(
       `INSERT INTO ticket
          (id, company_id, status, assigned_agent_id, assigned_at, reason)
@@ -124,13 +129,21 @@ describe('PostgreSQL ticket concurrency', () => {
       [closingId, COMPANY_ID, AGENT_A_ID]
     );
 
+    // Prefer close first in the per-company queue so assign must see post-close counts.
+    const closeResponsePromise = request(app).post(closeUrl(closingId));
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    const assignResponsePromise = request(app).post(assignUrl(assigningId));
+
     const [closeResponse, assignResponse] = await Promise.all([
-      request(app).post(closeUrl(closingId)),
-      request(app).post(assignUrl(assigningId)),
+      closeResponsePromise,
+      assignResponsePromise,
     ]);
 
     expect(closeResponse.status).toBe(200);
     expect(assignResponse.status).toBe(200);
+
+    // Proves assign used post-close workload (A), not stale pre-close (B).
+    expect(assignResponse.body.assignedAgentId).toBe(AGENT_A_ID);
 
     const { rows: tickets } = await pool.query<{
       id: string;
@@ -145,6 +158,9 @@ describe('PostgreSQL ticket concurrency', () => {
     );
     expect(tickets.find((ticket) => ticket.id === closingId)?.status).toBe('closed');
     expect(tickets.find((ticket) => ticket.id === assigningId)?.status).toBe('assigned');
+    expect(tickets.find((ticket) => ticket.id === assigningId)?.assigned_agent_id).toBe(
+      AGENT_A_ID
+    );
 
     const { rows: activeCounts } = await pool.query<{ count: number }>(
       `SELECT COUNT(*)::int AS count
@@ -155,3 +171,4 @@ describe('PostgreSQL ticket concurrency', () => {
     expect(activeCounts[0]?.count).toBe(1);
   });
 });
+

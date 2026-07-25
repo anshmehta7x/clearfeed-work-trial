@@ -26,17 +26,19 @@ type SortKey = number | string;
 const companyQueueTails = new Map<string, Promise<void>>();
 
 function enqueueCompanyWork<T>(companyId: string, work: () => Promise<T>): Promise<T> {
-  const previous = companyQueueTails.get(companyId) ?? Promise.resolve();
+  // Lowercase so mixed-case UUID strings share one queue (Postgres treats them as equal).
+  const queueKey = companyId.toLowerCase();
+  const previous = companyQueueTails.get(queueKey) ?? Promise.resolve();
   const result = previous.then(work, work);
   const tail = result.then(
     () => undefined,
     () => undefined
   );
-  companyQueueTails.set(companyId, tail);
+  companyQueueTails.set(queueKey, tail);
   void tail.then(() => {
     // A newer operation may have replaced this tail while work was running.
-    if (companyQueueTails.get(companyId) === tail) {
-      companyQueueTails.delete(companyId);
+    if (companyQueueTails.get(queueKey) === tail) {
+      companyQueueTails.delete(queueKey);
     }
   });
   return result;
