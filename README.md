@@ -88,3 +88,7 @@ cd ui && npm test
 
 ![image1](https://imgh.in/host/pc4h8c)
 ![image2](https://imgh.in/host/b22asx)
+
+## Demo
+
+[![Demo walkthrough](https://img.youtube.com/vi/nj4Fi9RiMEE/maxresdefault.jpg)](https://youtu.be/nj4Fi9RiMEE)
