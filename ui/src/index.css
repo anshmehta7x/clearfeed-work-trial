@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+:root,
+[data-theme="dark"] {
+  --ink: #161B22;
+  --panel: #1F2630;
+  --paper: #E8E4D9;
+  --line: #2C333E;
+  --line-on-paper: #C9C3B2;
+  --text: #E7E9EC;
+  --text-muted: #8B94A3;
+  --ink-on-paper: #23262B;
+  --ink-on-paper-muted: #6B675C;
+  --amber: #E8A33D;
+  --amber-dim: #4A3A22;
+  --sage: #6FA98B;
+  --sage-dim: #253A31;
+  --rust: #C1483F;
+  --rust-dim: #3D2220;
+}
+
+[data-theme="light"] {
+  --ink: #E8E4D9;
+  --panel: #F3F0E7;
+  --paper: #161B22;
+  --line: #C9C3B2;
+  --line-on-paper: #2C333E;
+  --text: #23262B;
+  --text-muted: #6B675C;
+  --ink-on-paper: #E7E9EC;
+  --ink-on-paper-muted: #8B94A3;
+  --amber: #C4841F;
+  --amber-dim: #F0D9A8;
+  --sage: #3F7A5C;
+  --sage-dim: #C5DDD0;
+  --rust: #A33A33;
+  --rust-dim: #E8C4C1;
+}
+
+@theme {
+  --color-ink: var(--ink);
+  --color-panel: var(--panel);
+  --color-paper: var(--paper);
+
+  --color-line: var(--line);
+  --color-line-on-paper: var(--line-on-paper);
+
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-ink-on-paper: var(--ink-on-paper);
+  --color-ink-on-paper-muted: var(--ink-on-paper-muted);
+
+  --color-amber: var(--amber);
+  --color-amber-dim: var(--amber-dim);
+  --color-sage: var(--sage);
+  --color-sage-dim: var(--sage-dim);
+  --color-rust: var(--rust);
+  --color-rust-dim: var(--rust-dim);
+
+  --font-display: "Big Shoulders Condensed", sans-serif;
+  --font-body: "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+
+  --radius-card: 10px;
+  --radius-pill: 999px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-ink);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.gap-hatch {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-rust) 0 4px,
+    var(--color-rust-dim) 4px 8px
+  );
+}

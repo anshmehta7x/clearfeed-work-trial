@@ -1,0 +1,19 @@
+import { Router } from 'express';
+import { validateUuidParams } from '../middleware/validateUuid.js';
+import * as ticketsController from '../controllers/tickets.controller.js';
+
+const router = Router({ mergeParams: true }); // mounted under /companies/:companyId
+
+router.get('/', validateUuidParams('companyId'), ticketsController.getTickets);
+router.post(
+  '/:ticketId/assign',
+  validateUuidParams('companyId', 'ticketId'),
+  ticketsController.assignTicket
+);
+router.post(
+  '/:ticketId/close',
+  validateUuidParams('companyId', 'ticketId'),
+  ticketsController.closeTicket
+);
+
+export default router;
